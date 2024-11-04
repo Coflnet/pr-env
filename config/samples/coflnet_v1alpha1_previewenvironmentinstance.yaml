@@ -1,0 +1,9 @@
+apiVersion: coflnet.coflnet.com/v1alpha1
+kind: PreviewEnvironmentInstance
+metadata:
+  labels:
+    app.kubernetes.io/name: pr-env
+    app.kubernetes.io/managed-by: kustomize
+  name: previewenvironmentinstance-sample
+spec:
+  # TODO(user): Add fields here

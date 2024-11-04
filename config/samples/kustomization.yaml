@@ -1,0 +1,5 @@
+## Append samples of your project ##
+resources:
+- coflnet_v1alpha1_previewenvironment.yaml
+- coflnet_v1alpha1_previewenvironmentinstance.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

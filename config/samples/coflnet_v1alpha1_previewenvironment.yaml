@@ -1,0 +1,10 @@
+apiVersion: coflnet.coflnet.com/v1alpha1
+kind: PreviewEnvironment
+metadata:
+  labels:
+    app.kubernetes.io/name: pr-env
+    app.kubernetes.io/managed-by: kustomize
+  name: previewenvironment-sample
+spec:
+  gitOrganization: Flou21
+  gitRepository: test-page
