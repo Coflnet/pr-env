@@ -9,7 +9,7 @@ Plans for more documentation and examples are definitly planned (so far)
 ## Getting Started
 
 The standard kubebuilder project template is being used
-So documentation from [kubebuilder.io]{https://kubebuilder.io} is mostly applicable
+So documentation from [kubebuilder.io](https://kubebuilder.io) is mostly applicable
 
 ### Prerequisites
 - go version v1.23.0+
