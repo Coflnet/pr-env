@@ -140,7 +140,7 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesService(ctx conte
 }
 
 func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesIngress(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
-	path := fmt.Sprintf("/%s/%s", pe.Spec.GitOrganization, pe.Spec.GitRepository)
+	path := fmt.Sprintf("/%s/%s/%d", pe.Spec.GitOrganization, pe.Spec.GitRepository, pei.Spec.PullRequestNumber)
 
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
