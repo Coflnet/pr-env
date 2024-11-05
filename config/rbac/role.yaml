@@ -31,13 +31,13 @@ rules:
 - apiGroups:
   - coflnet.coflnet.com
   resources:
-  - previewenvironment/finalizers
+  - previewenvironments/finalizers
   verbs:
   - update
 - apiGroups:
   - coflnet.coflnet.com
   resources:
-  - previewenvironment/status
+  - previewenvironments/status
   verbs:
   - get
   - patch
@@ -60,6 +60,42 @@ rules:
   - batch
   resources:
   - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - services
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - "apps"
+  resources:
+  - deployments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - "networking.k8s.io"
+  resources:
+  - ingresses
   verbs:
   - create
   - delete
