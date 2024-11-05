@@ -40,6 +40,20 @@ spec:
           spec:
             description: PreviewEnvironmentSpec defines the desired state of PreviewEnvironment.
             properties:
+              applicationSettings:
+                description: ApplicationSettings configuration for the running application
+                properties:
+                  ingressHostname:
+                    description: IngressHostname the hostname the application should
+                      get exposed on
+                    minLength: 0
+                    type: string
+                  port:
+                    description: Port is the port the application is listening on
+                    type: integer
+                required:
+                - ingressHostname
+                type: object
               containerRegistry:
                 description: ContainerRegistry configuration of the container registry
                   that should be used for the preview environments

@@ -90,7 +90,7 @@ func (r *PreviewEnvironmentInstanceReconciler) Reconcile(ctx context.Context, re
 
 	if pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusDeploymentOutdated {
 		r.log.Info("instance is being redeployed", "namespace", pei.Namespace, "name", pei.Name)
-		err := r.redeployInstance(ctx, &pei)
+		err := r.redeployInstance(ctx, &pe, &pei)
 		if err != nil {
 			r.log.Error(err, "unable to redeploy the PreviewEnvironmentInstance", "namespace", pei.Namespace, "name", pei.Name)
 			err = r.markPreviewEnvironmentInstanceAsFailed(ctx, &pei)

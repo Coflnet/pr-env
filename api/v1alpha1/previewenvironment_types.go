@@ -47,6 +47,10 @@ type PreviewEnvironmentSpec struct {
 	// +optional
 	// ContainerRegistry configuration of the container registry that should be used for the preview environments
 	ContainerRegistry ContainerRegistry `json:"containerRegistry"`
+
+	// +optional
+	// ApplicationSettings configuration for the running application
+	ApplicationSettings ApplicationSettings `json:"applicationSettings"`
 }
 
 type PreviewEnvironmentRef struct {
@@ -67,6 +71,17 @@ type ContainerRegistry struct {
 	// +kubebuilder:validation:MinLength=0
 	// +kubebuilder:validation:MaxLength=63
 	Repository string `json:"repository"`
+}
+
+type ApplicationSettings struct {
+
+	// +kubebuilder:validation:MinLength=0
+	// IngressHostname the hostname the application should get exposed on
+	IngressHostname string `json:"ingressHostname"`
+
+	// +optional
+	// Port is the port the application is listening on
+	Port int `json:"port"`
 }
 
 // PreviewEnvironmentStatus defines the observed state of PreviewEnvironment.

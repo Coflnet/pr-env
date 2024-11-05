@@ -12,33 +12,33 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *PreviewEnvironmentInstanceReconciler) redeployInstance(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+func (r *PreviewEnvironmentInstanceReconciler) redeployInstance(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	r.log.Info("Deploying the environment instance", "namespace", pei.Namespace, "name", pei.Name)
 
-	err := r.deployEnvironmentInstance(ctx, pei)
+	err := r.deployEnvironmentInstance(ctx, pe, pei)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *PreviewEnvironmentInstanceReconciler) deployEnvironmentInstance(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+func (r *PreviewEnvironmentInstanceReconciler) deployEnvironmentInstance(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	pei.Status.RebuildStatus = coflnetv1alpha1.RebuildStatusDeploying
 	if err := r.Status().Update(ctx, pei); err != nil {
 		return err
 	}
 
-	err := r.deployKubernetesDeployment(ctx, pei)
+	err := r.deployKubernetesDeployment(ctx, pe, pei)
 	if err != nil {
 		return err
 	}
 
-	err = r.deployKubernetesService(ctx, pei)
+	err = r.deployKubernetesService(ctx, pe, pei)
 	if err != nil {
 		return err
 	}
 
-	err = r.deployKubernetesIngress(ctx, pei)
+	err = r.deployKubernetesIngress(ctx, pe, pei)
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,9 @@ func (r *PreviewEnvironmentInstanceReconciler) deployEnvironmentInstance(ctx con
 	return nil
 }
 
-func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesDeployment(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesDeployment(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	var image = fmt.Sprintf("%s/%s/pr-env:%s-%s-%s", pe.Spec.ContainerRegistry.Registry, pe.Spec.ContainerRegistry.Repository, pei.Spec.GitOrganization, pei.Spec.GitRepository, pei.Spec.CommitHash)
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pei.Name,
@@ -69,10 +71,10 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesDeployment(ctx co
 					Containers: []corev1.Container{
 						{
 							Name:  pei.Name,
-							Image: fmt.Sprintf("muehlhansfl/pr-env:%s-%s-%s", pei.Spec.GitOrganization, pei.Spec.GitRepository, pei.Spec.CommitHash),
+							Image: image,
 							Ports: []corev1.ContainerPort{
 								{
-									ContainerPort: 80,
+									ContainerPort: int32(pe.Spec.ApplicationSettings.Port),
 									Name:          "http",
 								},
 							},
@@ -102,7 +104,7 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesDeployment(ctx co
 	return r.Create(ctx, deployment)
 }
 
-func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesService(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesService(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pei.Name,
@@ -115,7 +117,7 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesService(ctx conte
 			Ports: []corev1.ServicePort{
 				{
 					Name: "http",
-					Port: 80,
+					Port: int32(pe.Spec.ApplicationSettings.Port),
 				},
 			},
 		},
@@ -137,7 +139,9 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesService(ctx conte
 	return r.Create(ctx, service)
 }
 
-func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesIngress(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesIngress(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	path := fmt.Sprintf("/%s/%s", pe.Spec.GitOrganization, pe.Spec.GitRepository)
+
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      pei.Name,
@@ -149,18 +153,18 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesIngress(ctx conte
 		Spec: networkingv1.IngressSpec{
 			Rules: []networkingv1.IngressRule{
 				{
-					Host: fmt.Sprintf("pr-env-%s", pei.Name),
+					Host: pe.Spec.ApplicationSettings.IngressHostname,
 					IngressRuleValue: networkingv1.IngressRuleValue{
 						HTTP: &networkingv1.HTTPIngressRuleValue{
 							Paths: []networkingv1.HTTPIngressPath{
 								{
-									Path:     "/",
+									Path:     path,
 									PathType: strPtr(networkingv1.PathTypeImplementationSpecific),
 									Backend: networkingv1.IngressBackend{
 										Service: &networkingv1.IngressServiceBackend{
 											Name: pei.Name,
 											Port: networkingv1.ServiceBackendPort{
-												Number: 80,
+												Number: int32(pe.Spec.ApplicationSettings.Port),
 											},
 										},
 									},

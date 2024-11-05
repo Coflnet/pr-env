@@ -12,3 +12,7 @@ spec:
   containerRegistry:
     registry: index.docker.io
     repository: muehlhansfl
+
+  applicationSettings:
+    ingressHostname: preview.flou.dev
+    port: 80
