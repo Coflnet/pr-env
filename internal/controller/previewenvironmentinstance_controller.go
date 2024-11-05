@@ -41,13 +41,19 @@ type PreviewEnvironmentInstanceReconciler struct {
 // +kubebuilder:rbac:groups=coflnet.coflnet.com,resources=previewenvironmentinstances,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=coflnet.coflnet.com,resources=previewenvironmentinstances/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=coflnet.coflnet.com,resources=previewenvironmentinstances/finalizers,verbs=update
-
 func (r *PreviewEnvironmentInstanceReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.log = log.FromContext(ctx)
 
 	// load the pei
 	var pei coflnetv1alpha1.PreviewEnvironmentInstance
 	if err := r.Get(ctx, req.NamespacedName, &pei); err != nil {
+		r.log.Error(err, "unable to load the PreviewEnvironmentInstance", "namespace", req.Namespace, "name", req.Name)
+		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	var pe coflnetv1alpha1.PreviewEnvironment
+	if err := r.Get(ctx, client.ObjectKey{Name: pei.Spec.PreviewEnvironmentRef.Name, Namespace: pei.Spec.PreviewEnvironmentRef.Namespace}, &pe); err != nil {
+		r.log.Error(err, "unable to load the PreviewEnvironment", "namespace", pei.Namespace, "name", pei.Name)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
@@ -56,8 +62,8 @@ func (r *PreviewEnvironmentInstanceReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 	}
 
-	if pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusBuildingOutdated || pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusFailed {
-		err := r.rebuildInstance(ctx, &pei)
+	if pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusBuildingOutdated || pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusFailed || pei.Status.RebuildStatus == "" {
+		err := r.rebuildInstance(ctx, &pe, &pei)
 		if err != nil {
 			r.log.Error(err, "unable to rebuild the PreviewEnvironmentInstance", "namespace", pei.Namespace, "name", pei.Name)
 			err = r.markPreviewEnvironmentInstanceAsFailed(ctx, &pei)

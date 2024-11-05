@@ -15,7 +15,7 @@ import (
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
 )
 
-func (r *PreviewEnvironmentInstanceReconciler) rebuildInstance(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+func (r *PreviewEnvironmentInstanceReconciler) rebuildInstance(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	// check if a build version is already available
 	builtAvailable := false
 	if pei.Status.BuiltVersions != nil {
@@ -34,14 +34,14 @@ func (r *PreviewEnvironmentInstanceReconciler) rebuildInstance(ctx context.Conte
 
 	// build the container image
 	r.log.Info("Building container image for PreviewEnvironmentInstance", "namespace", pei.Namespace, "name", pei.Name)
-	err := r.buildContainerImage(ctx, pei)
+	err := r.buildContainerImage(ctx, pe, pei)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *PreviewEnvironmentInstanceReconciler) buildContainerImage(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+func (r *PreviewEnvironmentInstanceReconciler) buildContainerImage(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	job := &kbatch.Job{}
 	if err := r.Get(ctx, types.NamespacedName{Name: pei.Name, Namespace: pei.Namespace}, job); err != nil {
 		if !errors.IsNotFound(err) {
@@ -66,7 +66,7 @@ func (r *PreviewEnvironmentInstanceReconciler) buildContainerImage(ctx context.C
 		return err
 	}
 
-	err := r.buildAndWaitForContainerImage(ctx, pei)
+	err := r.buildAndWaitForContainerImage(ctx, pe, pei)
 	pei.Status.BuiltVersions = updateBuiltVersions(pei.Status.BuiltVersions, pei.Spec.CommitHash, 10)
 
 	pei.Status.RebuildStatus = coflnetv1alpha1.RebuildStatusDeploymentOutdated
@@ -98,9 +98,10 @@ func updateBuiltVersions(versions []coflnetv1alpha1.BuiltVersion, commitHash str
 	return versions
 }
 
-func (r *PreviewEnvironmentInstanceReconciler) buildAndWaitForContainerImage(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+func (r *PreviewEnvironmentInstanceReconciler) buildAndWaitForContainerImage(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	const kanikoSecret = "dockerhub"
 	var jobName = fmt.Sprintf("build-%s", pei.Name)
+	var destination = fmt.Sprintf("%s/%s/pr-env:%s-%s-%s", pe.Spec.ContainerRegistry.Registry, pe.Spec.ContainerRegistry.Repository, pei.Spec.GitOrganization, pei.Spec.GitRepository, pei.Spec.CommitHash)
 
 	kanikoJob := &kbatch.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -119,7 +120,7 @@ func (r *PreviewEnvironmentInstanceReconciler) buildAndWaitForContainerImage(ctx
 							Args: []string{
 								"--dockerfile=Dockerfile",
 								fmt.Sprintf("--context=git://github.com/%s/%s.git#refs/heads/%s", pei.Spec.GitOrganization, pei.Spec.GitRepository, *pei.Spec.Branch),
-								fmt.Sprintf("--destination=muehlhansfl/pr-env:%s-%s-%s", pei.Spec.GitOrganization, pei.Spec.GitRepository, pei.Spec.CommitHash),
+								fmt.Sprintf("--destination=%s", destination),
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{
@@ -168,7 +169,7 @@ func (r *PreviewEnvironmentInstanceReconciler) buildAndWaitForContainerImage(ctx
 		}
 	}
 
-	r.log.Info("Creating kaniko job", "namespace", pei.Namespace, "name", pei.Name)
+	r.log.Info("Creating kaniko job", "namespace", pei.Namespace, "name", pei.Name, "destination", destination)
 	if err := r.Create(ctx, kanikoJob); err != nil {
 		return err
 	}

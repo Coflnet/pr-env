@@ -8,3 +8,7 @@ metadata:
 spec:
   gitOrganization: Flou21
   gitRepository: test-page
+
+  containerRegistry:
+    registry: index.docker.io
+    repository: muehlhansfl

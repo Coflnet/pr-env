@@ -155,8 +155,12 @@ func (r *PreviewEnvironmentReconciler) createPreviewEnvironmentInstancesForDetec
 				GitOrganization:   pr.Spec.GitOrganization,
 				GitRepository:     pr.Spec.GitRepository,
 				PreviewEnvironmentRef: coflnetv1alpha1.PreviewEnvironmentRef{
-					Name: pr.Name,
+					Name:      pr.Name,
+					Namespace: pr.Namespace,
 				},
+			},
+			Status: coflnetv1alpha1.PreviewEnvironmentInstanceStatus{
+				RebuildStatus: coflnetv1alpha1.RebuildStatusBuildingOutdated,
 			},
 		}
 
@@ -165,6 +169,7 @@ func (r *PreviewEnvironmentReconciler) createPreviewEnvironmentInstancesForDetec
 		if err := r.Create(ctx, &pei); err != nil {
 			return err
 		}
+		r.log.Info("created preview environment instance", "pei", pei.Name, "namespace", pei.Namespace)
 	}
 	return nil
 }

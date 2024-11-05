@@ -43,6 +43,10 @@ type PreviewEnvironmentSpec struct {
 	// +kubebuilder:validation:MinLength=0
 	// +kubebuilder:validation:MaxLength=63
 	GitRepository string `json:"gitRepository"`
+
+	// +optional
+	// ContainerRegistry configuration of the container registry that should be used for the preview environments
+	ContainerRegistry ContainerRegistry `json:"containerRegistry"`
 }
 
 type PreviewEnvironmentRef struct {
@@ -53,6 +57,16 @@ type PreviewEnvironmentRef struct {
 	// +kubebuilder:validation:MinLength=0
 	// +kubebuilder:validation:MaxLength=63
 	Namespace string `json:"namespace"`
+}
+
+type ContainerRegistry struct {
+	// +kubebuilder:validation:MinLength=0
+	// +kubebuilder:validation:MaxLength=63
+	Registry string `json:"registry"`
+
+	// +kubebuilder:validation:MinLength=0
+	// +kubebuilder:validation:MaxLength=63
+	Repository string `json:"repository"`
 }
 
 // PreviewEnvironmentStatus defines the observed state of PreviewEnvironment.
