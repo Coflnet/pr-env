@@ -1,6 +1,9 @@
 name: Release
 
-on: push
+on:
+  push:
+    tags:
+      - '*'
 
 env:
   GOLANG_VERSION: '1.23'
