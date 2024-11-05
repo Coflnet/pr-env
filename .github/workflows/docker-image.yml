@@ -32,11 +32,9 @@ jobs:
       run: |
         mkdir -p manifests
         cd config/default
-        kustomize edit set image controller=muelhansfl/pr-env-operator:$IMAGE_TAG
+        kustomize edit set image controller=muelhansfl/pr-env-operator:${{  github.ref_name }}
         kustomize build . > install.yaml
         cp install.yaml ../../manifests/install.yaml
-      env:
-        IMAGE_TAG: ${{ github.event.inputs.tag }}
 
     - name: Build and push Docker image
       id: push
