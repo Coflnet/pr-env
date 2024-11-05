@@ -34,11 +34,21 @@ kind: PreviewEnvironment
 metadata:
   name: previewenvironment-sample
 spec:
+
+  # configure your github repository
   gitOrganization: Flou21
   gitRepository: test-page
+
+  # configure the container registry the images should be pushed to
   containerRegistry:
     registry: index.docker.io
     repository: muehlhansfl
+
+  # configure the preview environment application
+  applicationSettings:
+    ingressHostname: preview.flou.dev
+    port: 80
+
 ```
 
 
