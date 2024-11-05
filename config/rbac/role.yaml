@@ -31,6 +31,20 @@ rules:
 - apiGroups:
   - coflnet.coflnet.com
   resources:
+  - previewenvironment/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - coflnet.coflnet.com
+  resources:
+  - previewenvironment/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - coflnet.coflnet.com
+  resources:
   - previewenvironmentinstances/finalizers
   verbs:
   - update
@@ -42,3 +56,15 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - batch
+  resources:
+  - jobs
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
