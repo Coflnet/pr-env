@@ -43,6 +43,14 @@ jobs:
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}
 
+    - name: Draft release
+      uses: softprops/action-gh-release@e7a8f85e1c67a31e6ed99a94b41bd0b71bbee6b8 # v0.1.15
+      with:
+        tag_name: ${{ github.event.inputs.tag }}
+        draft: true
+        files: |
+          manifests/install.yaml
+
       
 
       
