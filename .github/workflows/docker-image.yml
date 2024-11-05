@@ -31,7 +31,10 @@ jobs:
     - name: Generate release artifacts
       run: |
         mkdir -p manifests
-        kustomize build config/default > manifests/install.yaml
+        cd config/default
+        kustomize edit set image controller=muelhansfl/pr-env-operator:${{ github.event.inputs.tag }}
+        kustomize build . > install.yaml
+        cp install.yaml ../../manifests/install.yaml
 
     - name: Build and push Docker image
       id: push
