@@ -14,7 +14,8 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-
+      
+        
     - name: Log in to Docker Hub
       uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a
       with:
@@ -26,6 +27,12 @@ jobs:
       uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
       with:
         images: muehlhansfl/pr-env-operator
+
+    - name: Generate release artifacts
+      run: |
+        make release-plugins
+        make checksums
+        make manifests IMAGE_TAG=${{ steps.meta.outputs.tags[0] }}
 
     - name: Build and push Docker image
       id: push
