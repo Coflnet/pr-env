@@ -30,9 +30,7 @@ jobs:
 
     - name: Generate release artifacts
       run: |
-        make release-plugins
-        make checksums
-        make manifests IMAGE_TAG=${{ steps.meta.outputs.tags[0] }}
+        kustomize build config/default > manifests/install.yaml
 
     - name: Build and push Docker image
       id: push
