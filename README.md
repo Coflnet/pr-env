@@ -11,6 +11,39 @@ Plans for more documentation and examples are definitly planned (so far)
 The standard kubebuilder project template is being used
 So documentation from [kubebuilder.io](https://kubebuilder.io) is mostly applicable
 
+### Installation
+
+To install the project, you can apply the manifests from the latest release
+Or you can create a kustomize bundle to install the operator
+
+```yaml
+resources:
+  - https://github.com/Coflnet/pr-env/releases/download/0.0.1-dev7/install.yaml
+```
+
+```sh
+kubectl apply -k .
+```
+
+After installing the operator you can create a `PreviewEnvironment` resource
+In that resource you can configure all the necessary settings
+(The project is still in early development and the configuration will definitly change in the future)
+```yaml
+apiVersion: coflnet.coflnet.com/v1alpha1
+kind: PreviewEnvironment
+metadata:
+  name: previewenvironment-sample
+spec:
+  gitOrganization: Flou21
+  gitRepository: test-page
+  containerRegistry:
+    registry: index.docker.io
+    repository: muehlhansfl
+```
+
+
+## Development
+
 ### Prerequisites
 - go version v1.23.0+
 - docker version 17.03+.
