@@ -7,6 +7,18 @@ rules:
 - apiGroups:
   - coflnet.coflnet.com
   resources:
+  - previewenvironments
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - coflnet.coflnet.com
+  resources:
   - previewenvironmentinstances
   verbs:
   - create
