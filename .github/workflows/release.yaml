@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - '*'
+
+env:
+  GOLANG_VERSION: '1.23'
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+        
+    - name: Log in to Docker Hub
+      uses: docker/login-action@f4ef78c080cd8ba55a85445d5b36e214a81df20a
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+
+    - name: Extract metadata (tags, labels) for Docker
+      id: meta
+      uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+      with:
+        images: muehlhansfl/pr-env-operator
+
+    - name: Generate release artifacts
+      run: |
+        mkdir -p manifests
+        cd config/default
+        kustomize edit set image controller=muelhansfl/pr-env-operator:${{  github.ref_name }}
+        kustomize build . > install.yaml
+        cp install.yaml ../../manifests/install.yaml
+
+    - name: Build and push Docker image
+      id: push
+      uses: docker/build-push-action@3b5e8027fcad23fda98b2e3ac259d8d67585f671
+      with:
+        context: .
+        file: ./Dockerfile
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+
+    - name: Draft release
+      uses: softprops/action-gh-release@e7a8f85e1c67a31e6ed99a94b41bd0b71bbee6b8 # v0.1.15
+      with:
+        tag_name: ${{ github.event.inputs.tag }}
+        draft: true
+        files: |
+          manifests/install.yaml
+
+      
+
+      
