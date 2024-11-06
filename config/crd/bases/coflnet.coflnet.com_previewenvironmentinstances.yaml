@@ -91,6 +91,10 @@ spec:
                       type: string
                   type: object
                 type: array
+              publicFacingUrl:
+                description: PublicFacingUrl the url where the preview environment
+                  can be accessed
+                type: string
               rebuildStatus:
                 description: RebuildStatus the status of the rebuild
                 type: string

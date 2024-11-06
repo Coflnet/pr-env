@@ -5,13 +5,15 @@ import (
 	"os"
 	"strings"
 
+	coflnetv1alpha "github.com/coflnet/pr-env/api/v1alpha1"
+	"github.com/go-logr/logr"
 	"github.com/google/go-github/v66/github"
 	_ "github.com/joho/godotenv/autoload"
 )
 
 var githubClient *GithubClient
 
-func NewGithubClient() (*GithubClient, error) {
+func NewGithubClient(logger logr.Logger) (*GithubClient, error) {
 	if githubClient != nil {
 		return githubClient, nil
 	}
@@ -19,10 +21,12 @@ func NewGithubClient() (*GithubClient, error) {
 	if authTokenSet() {
 		githubClient = &GithubClient{
 			client: github.NewClient(nil).WithAuthToken(authToken()),
+			log:    logger,
 		}
 	} else {
 		githubClient = &GithubClient{
 			client: github.NewClient(nil),
+			log:    logger,
 		}
 	}
 
@@ -31,6 +35,7 @@ func NewGithubClient() (*GithubClient, error) {
 
 type GithubClient struct {
 	client *github.Client
+	log    logr.Logger
 }
 
 func (c *GithubClient) PullRequestsOfRepository(ctx context.Context, owner, repo string) ([]*github.PullRequest, error) {
@@ -56,6 +61,10 @@ func (c *GithubClient) PullRequestsOfRepositoryAndBranch(ctx context.Context, ow
 	}
 
 	return filteredPrs, nil
+}
+
+func (c *GithubClient) PullRequestOfPei(ctx context.Context, pei *coflnetv1alpha.PreviewEnvironmentInstance) (*github.PullRequest, error) {
+	return c.PullRequest(ctx, pei.Spec.GitOrganization, pei.Spec.GitRepository, pei.Spec.PullRequestNumber)
 }
 
 func (c *GithubClient) PullRequest(ctx context.Context, owner, repo string, number int) (*github.PullRequest, error) {

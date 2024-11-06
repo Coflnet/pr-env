@@ -107,6 +107,12 @@ func (r *PreviewEnvironmentInstanceReconciler) Reconcile(ctx context.Context, re
 			return ctrl.Result{}, err
 		}
 
+		r.log.Info("updating github pull request", "namespace", pei.Namespace, "name", pei.Name)
+		if err := r.githubClient.UpdatePullRequestAnswer(ctx, &pe, &pei); err != nil {
+			r.log.Error(err, "unable to update the pull request", "namespace", pei.Namespace, "name", pei.Name)
+			return ctrl.Result{RequeueAfter: time.Minute * 1}, nil
+		}
+
 	}
 
 	// fetching the latest information about the pull request
@@ -158,12 +164,7 @@ func (r *PreviewEnvironmentInstanceReconciler) markPreviewEnvironmentInstanceAsF
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *PreviewEnvironmentInstanceReconciler) SetupWithManager(mgr ctrl.Manager) error {
-
-	gh, err := git.NewGithubClient()
-	if err != nil {
-		return err
-	}
+func (r *PreviewEnvironmentInstanceReconciler) SetupWithManager(mgr ctrl.Manager, gh *git.GithubClient) error {
 	r.githubClient = gh
 
 	return ctrl.NewControllerManagedBy(mgr).

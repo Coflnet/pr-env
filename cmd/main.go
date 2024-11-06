@@ -82,7 +82,7 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	// setup the github client
-	gc, err := git.NewGithubClient()
+	gc, err := git.NewGithubClient(ctrl.Log.WithName("githubclient"))
 	if err != nil {
 		setupLog.Error(err, "unable to create github client")
 		os.Exit(1)
@@ -165,7 +165,7 @@ func main() {
 	if err = (&controller.PreviewEnvironmentInstanceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(mgr, gc); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PreviewEnvironmentInstance")
 		os.Exit(1)
 	}

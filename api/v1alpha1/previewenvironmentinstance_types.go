@@ -58,6 +58,10 @@ type PreviewEnvironmentInstanceStatus struct {
 
 	// +optional
 	BuiltVersions []BuiltVersion `json:"builtVersions"`
+
+	// +optional
+	// PublicFacingUrl the url where the preview environment can be accessed
+	PublicFacingUrl string `json:"publicFacingUrl"`
 }
 
 type BuiltVersion struct {

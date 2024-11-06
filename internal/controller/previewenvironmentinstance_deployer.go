@@ -141,6 +141,8 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesService(ctx conte
 
 func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesIngress(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	path := fmt.Sprintf("/%s/%s/%d", pe.Spec.GitOrganization, pe.Spec.GitRepository, pei.Spec.PullRequestNumber)
+	host := pe.Spec.ApplicationSettings.IngressHostname
+	publicEndpoint := fmt.Sprintf("https://%s%s", host, path)
 
 	ingress := &networkingv1.Ingress{
 		ObjectMeta: metav1.ObjectMeta{
@@ -153,7 +155,7 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesIngress(ctx conte
 		Spec: networkingv1.IngressSpec{
 			Rules: []networkingv1.IngressRule{
 				{
-					Host: pe.Spec.ApplicationSettings.IngressHostname,
+					Host: host,
 					IngressRuleValue: networkingv1.IngressRuleValue{
 						HTTP: &networkingv1.HTTPIngressRuleValue{
 							Paths: []networkingv1.HTTPIngressPath{
@@ -186,11 +188,17 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesIngress(ctx conte
 		if err != nil {
 			return err
 		}
-		return nil
+	} else {
+		r.log.Info("Creating ingress", "namespace", pei.Namespace, "name", pei.Name)
+		err = r.Create(ctx, ingress)
+		if err != nil {
+			return err
+		}
 	}
 
-	r.log.Info("Creating ingress", "namespace", pei.Namespace, "name", pei.Name)
-	return r.Create(ctx, ingress)
+	pei.Status.PublicFacingUrl = publicEndpoint
+	r.log.Info("Updating the status of the PreviewEnvironmentInstance", "namespace", pei.Namespace, "name", pei.Name, "publicFacingUrl", publicEndpoint)
+	return r.Status().Update(ctx, pei)
 }
 
 func strPtr(s networkingv1.PathType) *networkingv1.PathType {
