@@ -23,6 +23,7 @@ import (
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
+	"k8s.io/client-go/dynamic"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"k8s.io/apimachinery/pkg/runtime"
@@ -37,6 +38,9 @@ import (
 
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
 	"github.com/coflnet/pr-env/internal/controller"
+	"github.com/coflnet/pr-env/internal/kubeclient"
+	"github.com/coflnet/pr-env/internal/server"
+	"github.com/coflnet/pr-env/pkg/git"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -76,6 +80,13 @@ func main() {
 	flag.Parse()
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
+
+	// setup the github client
+	gc, err := git.NewGithubClient()
+	if err != nil {
+		setupLog.Error(err, "unable to create github client")
+		os.Exit(1)
+	}
 
 	// if the enable-http2 flag is false (the default), http/2 should be disabled
 	// due to its vulnerabilities. More specifically, disabling http/2 will
@@ -147,7 +158,7 @@ func main() {
 	if err = (&controller.PreviewEnvironmentReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+	}).SetupWithManager(mgr, gc); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PreviewEnvironment")
 		os.Exit(1)
 	}
@@ -168,6 +179,24 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
+
+	dClient, err := dynamic.NewForConfig(mgr.GetConfig())
+	if err != nil {
+		setupLog.Error(err, "unable to create dynamic client")
+		os.Exit(1)
+	}
+
+	kubeLogger := ctrl.Log.WithName("kubeclient")
+	kubeClient := kubeclient.NewKubeClient(kubeLogger, dClient)
+	serverLogger := ctrl.Log.WithName("server")
+	server := server.NewServer(&serverLogger, gc, kubeClient)
+
+	go func() {
+		if err := server.ListenAndServe(); err != nil {
+			setupLog.Error(err, "unable to start server")
+			os.Exit(1)
+		}
+	}()
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

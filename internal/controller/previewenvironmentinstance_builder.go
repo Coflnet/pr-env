@@ -121,6 +121,7 @@ func (r *PreviewEnvironmentInstanceReconciler) buildAndWaitForContainerImage(ctx
 								"--dockerfile=Dockerfile",
 								fmt.Sprintf("--context=git://github.com/%s/%s.git#refs/heads/%s", pei.Spec.GitOrganization, pei.Spec.GitRepository, *pei.Spec.Branch),
 								fmt.Sprintf("--destination=%s", destination),
+								fmt.Sprintf("--custom-platform=%s", "linux/amd64"),
 							},
 							VolumeMounts: []corev1.VolumeMount{
 								{

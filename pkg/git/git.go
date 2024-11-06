@@ -3,6 +3,7 @@ package git
 import (
 	"context"
 	"os"
+	"strings"
 
 	"github.com/google/go-github/v66/github"
 	_ "github.com/joho/godotenv/autoload"
@@ -39,6 +40,22 @@ func (c *GithubClient) PullRequestsOfRepository(ctx context.Context, owner, repo
 	}
 
 	return prs, nil
+}
+
+func (c *GithubClient) PullRequestsOfRepositoryAndBranch(ctx context.Context, owner, repo, branch string) ([]*github.PullRequest, error) {
+	prs, _, err := c.client.PullRequests.List(ctx, owner, repo, &github.PullRequestListOptions{})
+	if err != nil {
+		return nil, err
+	}
+
+	var filteredPrs []*github.PullRequest
+	for _, pr := range prs {
+		if strings.Contains(pr.GetHead().GetRef(), branch) {
+			filteredPrs = append(filteredPrs, pr)
+		}
+	}
+
+	return filteredPrs, nil
 }
 
 func (c *GithubClient) PullRequest(ctx context.Context, owner, repo string, number int) (*github.PullRequest, error) {

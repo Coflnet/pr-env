@@ -194,14 +194,9 @@ func (r *PreviewEnvironmentReconciler) deletePreviewEnvironmentInstancesForPrevi
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *PreviewEnvironmentReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *PreviewEnvironmentReconciler) SetupWithManager(mgr ctrl.Manager, gc *git.GithubClient) error {
 	r.log = log.FromContext(context.TODO())
 
-	// setup the github client
-	gc, err := git.NewGithubClient()
-	if err != nil {
-		return err
-	}
 	r.githubClient = gc
 
 	// setup the indexer stuff
