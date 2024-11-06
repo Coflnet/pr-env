@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"strings"
 	"time"
 
 	kbatch "k8s.io/api/batch/v1"
@@ -11,8 +12,13 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
+)
+
+const (
+	buildPrefix = "build-"
 )
 
 func (r *PreviewEnvironmentInstanceReconciler) rebuildInstance(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
@@ -100,7 +106,7 @@ func updateBuiltVersions(versions []coflnetv1alpha1.BuiltVersion, commitHash str
 
 func (r *PreviewEnvironmentInstanceReconciler) buildAndWaitForContainerImage(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	const kanikoSecret = "dockerhub"
-	var jobName = fmt.Sprintf("build-%s", pei.Name)
+	var jobName = fmt.Sprintf("%s%s", buildPrefix, pei.Name)
 	var destination = fmt.Sprintf("%s/%s/pr-env:%s-%s-%s", pe.Spec.ContainerRegistry.Registry, pe.Spec.ContainerRegistry.Repository, pei.Spec.GitOrganization, pei.Spec.GitRepository, pei.Spec.CommitHash)
 
 	kanikoJob := &kbatch.Job{
@@ -197,6 +203,47 @@ func (r *PreviewEnvironmentInstanceReconciler) buildAndWaitForContainerImage(ctx
 			err := fmt.Errorf("timeout while waiting for kaniko job to finish")
 			r.log.Error(err, "timeout while waiting for kaniko job to finish", "namespace", pei.Namespace, "name", pei.Name)
 			return err
+		}
+	}
+
+	go func() {
+		err := r.deleteCompletedPods(ctx, pei)
+		if err != nil {
+			r.log.Error(err, "Failed to delete completed pods", "namespace", pei.Namespace, "name", pei.Name)
+		}
+	}()
+
+	return nil
+}
+
+func (r *PreviewEnvironmentInstanceReconciler) deleteCompletedPods(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	pods := &corev1.PodList{}
+	// PERF: it would be cool to use field selectors here
+	// that way we only get the pods we need
+	if err := r.List(ctx, pods, &client.ListOptions{
+		Namespace: pei.Namespace,
+	}); err != nil {
+		return err
+	}
+
+	// HACK: there has to be a better way to do this
+	for _, pod := range pods.Items {
+		if !strings.HasPrefix(pod.Name, buildPrefix) {
+			continue
+		}
+
+		if pod.Status.Phase == corev1.PodSucceeded || pod.Status.Phase == corev1.PodFailed {
+			statuses := pod.Status.ContainerStatuses
+			for _, status := range statuses {
+				if status.State.Terminated != nil {
+					age := time.Now().Sub(status.State.Terminated.FinishedAt.Time)
+					if age > time.Minute*10 {
+						if err := r.Delete(ctx, &pod); err != nil {
+							return err
+						}
+					}
+				}
+			}
 		}
 	}
 
