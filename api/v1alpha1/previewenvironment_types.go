@@ -20,22 +20,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PreviewEnvironment is the Schema for the previewenvironments API.
-// +genclient
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
-type PreviewEnvironment struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
-
-	Spec   PreviewEnvironmentSpec   `json:"spec,omitempty"`
-	Status PreviewEnvironmentStatus `json:"status,omitempty"`
-}
-
 // PreviewEnvironmentSpec defines the desired state of PreviewEnvironment.
 type PreviewEnvironmentSpec struct {
-
 	// +kubebuilder:validation:MinLength=0
 	// +kubebuilder:validation:MaxLength=63
 	GitOrganization string `json:"gitOrganization"`
@@ -86,14 +72,23 @@ type ApplicationSettings struct {
 
 // PreviewEnvironmentStatus defines the observed state of PreviewEnvironment.
 type PreviewEnvironmentStatus struct {
-	// +optional
-
 	// PullRequestsDetected is a list of pullRequests that were detected
 	PullRequestsDetected []int `json:"pullRequests"`
 }
 
 // +kubebuilder:object:root=true
-// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:subresource:status
+
+// PreviewEnvironment is the Schema for the previewenvironments API.
+type PreviewEnvironment struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   PreviewEnvironmentSpec   `json:"spec,omitempty"`
+	Status PreviewEnvironmentStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
 
 // PreviewEnvironmentList contains a list of PreviewEnvironment.
 type PreviewEnvironmentList struct {

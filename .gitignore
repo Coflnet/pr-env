@@ -27,3 +27,4 @@ go.work
 *~
 tmp
 .env
+vendor

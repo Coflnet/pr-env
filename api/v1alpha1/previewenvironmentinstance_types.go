@@ -75,6 +75,12 @@ type BuiltVersion struct {
 	Timestamp metav1.Time `json:"timestamp"`
 }
 
+func PreviewEnvironmentInstanceNameFromPullRequest(pe string, owner, repo string, number int) string {
+	name := fmt.Sprintf("%s-%s-%s-%d", pe, owner, repo, number)
+	name = strings.ReplaceAll(name, "/", "-")
+	return strings.ToLower(name)
+}
+
 const (
 	RebuildStatusBuildingOutdated   = "buildingOutdated"
 	RebuildStatusDeploymentOutdated = "deploymentOutdated"
@@ -107,10 +113,4 @@ type PreviewEnvironmentInstanceList struct {
 
 func init() {
 	SchemeBuilder.Register(&PreviewEnvironmentInstance{}, &PreviewEnvironmentInstanceList{})
-}
-
-func PreviewEnvironmentInstanceNameFromPullRequest(pe string, owner, repo string, number int) string {
-	name := fmt.Sprintf("%s-%s-%s-%d", pe, owner, repo, number)
-	name = strings.ReplaceAll(name, "/", "-")
-	return strings.ToLower(name)
 }

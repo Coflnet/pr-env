@@ -2,15 +2,16 @@ package kubeclient
 
 import (
 	"context"
-	"encoding/json"
+	"log"
 
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
 	"github.com/go-logr/logr"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
+	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 var (
@@ -20,12 +21,26 @@ var (
 
 type KubeClient struct {
 	dynamicClient *dynamic.DynamicClient
+	kClient       client.Client
 	log           logr.Logger
 }
 
 func NewKubeClient(logger logr.Logger, dynamicClient *dynamic.DynamicClient) *KubeClient {
+
+	scheme := runtime.NewScheme()
+	_ = clientgoscheme.AddToScheme(scheme)
+	_ = coflnetv1alpha1.AddToScheme(scheme)
+
+	kubeconfig := ctrl.GetConfigOrDie()
+	controllerClient, err := client.New(kubeconfig, client.Options{Scheme: scheme})
+	if err != nil {
+		log.Fatal(err)
+		return nil
+	}
+
 	return &KubeClient{
 		dynamicClient: dynamicClient,
+		kClient:       controllerClient,
 		log:           logger,
 	}
 }
@@ -33,44 +48,25 @@ func NewKubeClient(logger logr.Logger, dynamicClient *dynamic.DynamicClient) *Ku
 func (k *KubeClient) TriggerUpdateForPreviewEnvironmentInstance(ctx context.Context, owner, repo string, prNumber int) error {
 	k.log.Info("Triggering update for PreviewEnvironmentInstance", "owner", owner, "repo", repo, "prNumber", prNumber)
 
-	list, err := k.dynamicClient.Resource(previewEnvironmentInstanceResource).List(ctx, metav1.ListOptions{})
+	var peiList coflnetv1alpha1.PreviewEnvironmentInstanceList
+	err := k.kClient.List(ctx, &peiList, &client.ListOptions{})
 	if err != nil {
 		return err
 	}
 
-	for _, item := range list.Items {
-		ownerVal, _, _ := unstructured.NestedString(item.Object, "spec", "gitOrganization")
-		repoVal, _, _ := unstructured.NestedString(item.Object, "spec", "gitRepository")
-		prNumberVal, _, _ := unstructured.NestedInt64(item.Object, "spec", "pullRequestNumber")
+	for _, pei := range peiList.Items {
+		if pei.Spec.GitOrganization == owner && pei.Spec.GitRepository == repo && pei.Spec.PullRequestNumber == prNumber {
+			k.log.Info("Found matching PreviewEnvironmentInstance", "name", pei.GetName(), "namespace", pei.GetNamespace())
 
-		if ownerVal == owner && repoVal == repo && int(prNumberVal) == prNumber {
-			k.log.Info("Found matching PreviewEnvironmentInstance", "name", item.GetName())
+			// update the status field
+			pei.Status.RebuildStatus = coflnetv1alpha1.RebuildStatusBuildingOutdated
 
-			patch := []map[string]interface{}{
-				{
-					"op":    "replace",
-					"path":  "/status/rebuildStatus",
-					"value": coflnetv1alpha1.RebuildStatusBuilding,
-				},
-				{
-					"op":    "replace",
-					"path":  "/spec/commitHash",
-					"value": "newcommit",
-				},
-			}
-
-			payload, err := json.Marshal(patch)
+			err := k.kClient.Status().Update(ctx, &pei)
 			if err != nil {
 				return err
 			}
 
-			// Apply the JSON Patch to the resource
-			_, err = k.dynamicClient.Resource(previewEnvironmentInstanceResource).Namespace(item.GetNamespace()).Patch(context.TODO(), item.GetName(), types.JSONPatchType, payload, metav1.PatchOptions{})
-			if err != nil {
-				return err
-			}
-
-			k.log.Info("Updated PreviewEnvironmentInstance", "name", item.GetName(), "status", coflnetv1alpha1.RebuildStatusBuildingOutdated, "namespace", item.GetNamespace())
+			k.log.Info("Updated PreviewEnvironmentInstance", "name", pei.GetName(), "status", coflnetv1alpha1.RebuildStatusBuildingOutdated, "namespace", pei.GetNamespace())
 		}
 	}
 

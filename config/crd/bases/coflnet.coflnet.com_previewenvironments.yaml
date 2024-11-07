@@ -91,6 +91,8 @@ spec:
                 items:
                   type: integer
                 type: array
+            required:
+            - pullRequests
             type: object
         type: object
     served: true

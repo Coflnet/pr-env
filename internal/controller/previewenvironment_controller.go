@@ -200,7 +200,9 @@ func (r *PreviewEnvironmentReconciler) SetupWithManager(mgr ctrl.Manager, gc *gi
 
 	r.githubClient = gc
 
-	// setup the indexer stuff
+	// TODO: this does not work
+	// it would be way better to use the field indexer to search pei's
+	// PERF: oh also that
 	if err := mgr.GetFieldIndexer().IndexField(context.Background(), &coflnetv1alpha1.PreviewEnvironmentInstance{}, "spec.previewEnvironmentRef.name", func(o client.Object) []string {
 		pei := o.(*coflnetv1alpha1.PreviewEnvironmentInstance)
 		owner := metav1.GetControllerOf(pei)
