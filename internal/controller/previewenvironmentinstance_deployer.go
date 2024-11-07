@@ -46,6 +46,27 @@ func (r *PreviewEnvironmentInstanceReconciler) deployEnvironmentInstance(ctx con
 	return nil
 }
 
+func (r *PreviewEnvironmentInstanceReconciler) deleteResourcesForPreviewEnvironmentInstance(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	r.log.Info("Deleting resources for PreviewEnvironmentInstance", "namespace", pei.Namespace, "name", pei.Name)
+
+	err := r.deleteKubernetesDeployment(ctx, pei)
+	if err != nil {
+		r.log.Error(err, "Unable to delete deployment", "namespace", pei.Namespace, "name", pei.Name)
+	}
+
+	err = r.deleteKubernetesService(ctx, pei)
+	if err != nil {
+		r.log.Error(err, "Unable to delete service", "namespace", pei.Namespace, "name", pei.Name)
+	}
+
+	err = r.deleteKubernetesIngress(ctx, pei)
+	if err != nil {
+		r.log.Error(err, "Unable to delete ingress", "namespace", pei.Namespace, "name", pei.Name)
+	}
+
+	return nil
+}
+
 func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesDeployment(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	var image = fmt.Sprintf("%s/%s/pr-env:%s-%s-%s", pe.Spec.ContainerRegistry.Registry, pe.Spec.ContainerRegistry.Repository, pei.Spec.GitOrganization, pei.Spec.GitRepository, pei.Spec.CommitHash)
 
@@ -104,6 +125,20 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesDeployment(ctx co
 	return r.Create(ctx, deployment)
 }
 
+func (r *PreviewEnvironmentInstanceReconciler) deleteKubernetesDeployment(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	r.log.Info("Deleting deployment", "namespace", pei.Namespace, "name", pei.Name)
+	err := r.Delete(ctx, &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pei.Name,
+			Namespace: pei.Namespace,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesService(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -137,6 +172,20 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesService(ctx conte
 
 	r.log.Info("Creating service", "namespace", pei.Namespace, "name", pei.Name)
 	return r.Create(ctx, service)
+}
+
+func (r *PreviewEnvironmentInstanceReconciler) deleteKubernetesService(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	r.log.Info("Deleting service", "namespace", pei.Namespace, "name", pei.Name)
+	err := r.Delete(ctx, &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pei.Name,
+			Namespace: pei.Namespace,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesIngress(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
@@ -199,6 +248,20 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesIngress(ctx conte
 	pei.Status.PublicFacingUrl = publicEndpoint
 	r.log.Info("Updating the status of the PreviewEnvironmentInstance", "namespace", pei.Namespace, "name", pei.Name, "publicFacingUrl", publicEndpoint)
 	return r.Status().Update(ctx, pei)
+}
+
+func (r *PreviewEnvironmentInstanceReconciler) deleteKubernetesIngress(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	r.log.Info("Deleting ingress", "namespace", pei.Namespace, "name", pei.Name)
+	err := r.Delete(ctx, &networkingv1.Ingress{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pei.Name,
+			Namespace: pei.Namespace,
+		},
+	})
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func strPtr(s networkingv1.PathType) *networkingv1.PathType {

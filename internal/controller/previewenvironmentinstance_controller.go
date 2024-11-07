@@ -23,6 +23,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
@@ -49,6 +50,36 @@ func (r *PreviewEnvironmentInstanceReconciler) Reconcile(ctx context.Context, re
 	if err := r.Get(ctx, req.NamespacedName, &pei); err != nil {
 		r.log.Error(err, "unable to load the PreviewEnvironmentInstance", "namespace", req.Namespace, "name", req.Name)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
+	}
+
+	// check if the preview environment instance is being deleted
+	if !pei.ObjectMeta.DeletionTimestamp.IsZero() {
+		if controllerutil.ContainsFinalizer(&pei, finalizerName) {
+			// do some deletion work
+			err := r.deleteResourcesForPreviewEnvironmentInstance(ctx, &pei)
+			if err != nil {
+				r.log.Error(err, "Unable to delete resources dependent on preview environment instance", "namespace", req.Namespace, "name", req.Name)
+				return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
+			}
+
+			// remove the finalizer
+			controllerutil.RemoveFinalizer(&pei, finalizerName)
+			if err := r.Update(ctx, &pei); err != nil {
+				r.log.Error(err, "Unable to remove finalizer from PreviewEnvironment", "namespace", req.Namespace, "name", req.Name)
+				return ctrl.Result{}, err
+			}
+		}
+
+		return ctrl.Result{}, nil
+	}
+
+	// add the finalizer if it does not exist
+	if !controllerutil.ContainsFinalizer(&pei, finalizerName) {
+		controllerutil.AddFinalizer(&pei, finalizerName)
+		if err := r.Update(ctx, &pei); err != nil {
+			r.log.Error(err, "Unable to add finalizer to PreviewEnvironment", "namespace", req.Namespace, "name", req.Name)
+			return ctrl.Result{}, err
+		}
 	}
 
 	var pe coflnetv1alpha1.PreviewEnvironment

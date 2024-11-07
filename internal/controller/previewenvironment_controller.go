@@ -34,6 +34,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const finalizerName = "coflnet.com.pr.env/finalizer"
+
 // PreviewEnvironmentReconciler reconciles a PreviewEnvironment object
 type PreviewEnvironmentReconciler struct {
 	client.Client
@@ -47,7 +49,6 @@ type PreviewEnvironmentReconciler struct {
 // +kubebuilder:rbac:groups=coflnet.coflnet.com,resources=previewenvironments/finalizers,verbs=update
 func (r *PreviewEnvironmentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.log.Info("Reconciling PreviewEnvironment", "namespace", req.Namespace, "name", req.Name)
-	finalizerName := "coflnet.com.pr.env/finalizer"
 
 	// load the preview environment
 	var pr coflnetv1alpha1.PreviewEnvironment
