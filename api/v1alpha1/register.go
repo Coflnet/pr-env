@@ -14,6 +14,9 @@ var SchemeGroupVersion = schema.GroupVersion{Group: prenv.Group, Version: "v1alp
 var (
 	// GroupVersionResource for all rollout types
 	PreviewEnvironmentGVR = SchemeGroupVersion.WithResource("previewenvironments")
+
+	// PreviewEnvironmentInstanceGVR
+	PreviewEnvironmentInstanceGVR = SchemeGroupVersion.WithResource("previewenvironmentinstances")
 )
 
 // Kind takes an unqualified kind and returns back a Group qualified GroupKind

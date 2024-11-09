@@ -1,0 +1,154 @@
+basePath: /api/v1
+definitions:
+  server.applicationSettingsModel:
+    properties:
+      hostname:
+        type: string
+      port:
+        type: integer
+    type: object
+  server.containerSettingsModel:
+    properties:
+      image:
+        type: string
+      registry:
+        type: string
+    type: object
+  server.environmentModel:
+    properties:
+      applicationSettings:
+        $ref: '#/definitions/server.applicationSettingsModel'
+      containerSettings:
+        $ref: '#/definitions/server.containerSettingsModel'
+      gitSettings:
+        $ref: '#/definitions/server.gitSettingsModel'
+      name:
+        type: string
+    type: object
+  server.gitSettingsModel:
+    properties:
+      organization:
+        type: string
+      repository:
+        type: string
+    type: object
+  server.httpError:
+    properties:
+      message: {}
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: This is the Preview Environment Operator
+  termsOfService: http://swagger.io/terms/
+  title: Preview Environment Operator
+  version: "1.0"
+paths:
+  /environment:
+    post:
+      consumes:
+      - application/json
+      description: Creates a new environment
+      parameters:
+      - description: Environment to create
+        in: body
+        name: environment
+        required: true
+        schema:
+          $ref: '#/definitions/server.environmentModel'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/server.environmentModel'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.httpError'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/server.httpError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.httpError'
+      summary: Creates a new environment
+      tags:
+      - environment
+  /environment-instance/list/{name}:
+    get:
+      consumes:
+      - application/json
+      description: Lists all instances of an environment by the environment name
+      parameters:
+      - description: Name of the environment
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses: {}
+      summary: Lists all instances of an environment
+      tags:
+      - environmentinstance
+  /environment/{name}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes an environment based on the name
+      parameters:
+      - description: Name of the environment to delete
+        in: path
+        name: name
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.environmentModel'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.httpError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/server.httpError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.httpError'
+      summary: Deletes an environment
+      tags:
+      - environment
+  /environment/list:
+    get:
+      consumes:
+      - application/json
+      description: List of all environments the user has access to
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/server.environmentModel'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.httpError'
+      summary: List all available Environments
+      tags:
+      - environment
+swagger: "2.0"

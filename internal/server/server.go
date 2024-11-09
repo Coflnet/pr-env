@@ -1,15 +1,15 @@
 package server
 
 import (
-	"fmt"
-	"net/http"
 	"os"
 	"strconv"
-	"time"
 
 	"github.com/coflnet/pr-env/internal/kubeclient"
+	apigen "github.com/coflnet/pr-env/internal/server/openapi"
 	"github.com/coflnet/pr-env/pkg/git"
 	"github.com/go-logr/logr"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 )
 
 type Server struct {
@@ -18,22 +18,36 @@ type Server struct {
 	githubClient *git.GithubClient
 }
 
-func NewServer(logger *logr.Logger, githubClient *git.GithubClient, kubeClient *kubeclient.KubeClient) *http.Server {
+func NewServer(logger *logr.Logger, githubClient *git.GithubClient, kubeClient *kubeclient.KubeClient) *echo.Echo {
 	s := &Server{
 		githubClient: githubClient,
 		kubeClient:   kubeClient,
 		log:          logger,
 	}
 
-	server := http.Server{
-		Addr:         fmt.Sprintf(":%d", port()),
-		Handler:      s.RegisterRoutes(),
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-	}
+	e := echo.New()
+	e.Use(middleware.Recover())
+	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+		LogURI:    true,
+		LogStatus: true,
+		LogValuesFunc: func(c echo.Context, v middleware.RequestLoggerValues) error {
+			logger.Info("request",
+				"uri", v.URI,
+				"status", v.Status,
+				"latency", v.Latency,
+				"method", v.Method,
+			)
 
-	return &server
+			return nil
+		},
+	}))
+	e.Use(middleware.CORSWithConfig(middleware.DefaultCORSConfig))
+
+	e.Static("/api/openapi", "internal/server/openapi")
+
+	apigen.RegisterHandlersWithBaseURL(e, *s, "/api/v1")
+
+	return e
 }
 
 func port() int {
@@ -49,4 +63,10 @@ func port() int {
 	}
 
 	return p
+}
+
+type httpError struct {
+	Code     int         `json:"-"`
+	Message  interface{} `json:"message"`
+	Internal error       `json:"-"` // Stores the error returned by an external dependency
 }

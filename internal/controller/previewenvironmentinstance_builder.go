@@ -237,7 +237,7 @@ func (r *PreviewEnvironmentInstanceReconciler) deleteCompletedPods(ctx context.C
 			for _, status := range statuses {
 				if status.State.Terminated != nil {
 					age := time.Now().Sub(status.State.Terminated.FinishedAt.Time)
-					if age > time.Minute*10 {
+					if age > time.Minute*3 {
 						if err := r.Delete(ctx, &pod); err != nil {
 							return err
 						}

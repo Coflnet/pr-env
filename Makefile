@@ -136,6 +136,10 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 
+.PHONY: generate-openapi
+generate-openapi: ## Generate OpenAPI definitions.
+	cd internal/server/openapi && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen --config=./config.yaml ./openapi.yaml
+
 ##@ Deployment
 
 ifndef ignore-not-found

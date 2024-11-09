@@ -24,6 +24,7 @@ import (
 	_ "github.com/a8m/envsubst"
 	_ "github.com/ahmetb/gen-crd-api-reference-docs"
 	_ "github.com/itchyny/gojq/cmd/gojq"
+	_ "github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen"
 	_ "github.com/onsi/ginkgo/v2/ginkgo"
 	_ "go.uber.org/mock/mockgen"
 	_ "k8s.io/code-generator"
