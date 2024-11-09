@@ -52,8 +52,8 @@ func convertToEnvironmentInstanceModel(in *coflnetv1alpha1.PreviewEnvironmentIns
 
 // List all available Environments
 // (GET /environment/list)
-func (s Server) GetEnvironmentInstanceListName(c echo.Context, name string) error {
-	list, err := s.kubeClient.ListPreviewEnvironmentInstances(c.Request().Context(), name)
+func (s Server) GetEnvironmentInstanceListOwner(c echo.Context, owner string) error {
+	list, err := s.kubeClient.ListPreviewEnvironmentInstances(c.Request().Context(), owner)
 	if err != nil {
 		return echo.NewHTTPError(500, err.Error())
 	}

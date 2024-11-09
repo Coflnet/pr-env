@@ -6,10 +6,12 @@ import (
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
 	"github.com/labstack/echo/v4"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 type environmentModel struct {
+	Id                  types.UID                `json:"id"`
 	Name                string                   `json:"name"`
 	GitSettings         gitSettingsModel         `json:"gitSettings"`
 	ContainerSettings   containerSettingsModel   `json:"containerSettings"`
@@ -50,18 +52,18 @@ func (s Server) PostEnvironment(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 	}
 
-	// check if there is already an environment with the same name
-	kPe, err := s.kubeClient.PreviewEnvironmentByName(c.Request().Context(), env.Name)
-	if err != nil {
-		if client.IgnoreNotFound(err) != nil {
-			s.log.Error(err, "failed to get environment by name")
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-		}
-	}
-	if kPe != nil {
-		s.log.Info("environment already exists", "name", env.Name)
-		return echo.NewHTTPError(http.StatusConflict, "environment already exists")
-	}
+	// TODO: check if the user already has an environment with the same name
+	// kPe, err := s.kubeClient.PreviewEnvironmentById(c.Request().Context(), env.Name)
+	// if err != nil {
+	// 	if client.IgnoreNotFound(err) != nil {
+	// 		s.log.Error(err, "failed to get environment by name")
+	// 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	// 	}
+	// }
+	// if kPe != nil {
+	// 	s.log.Info("environment already exists", "name", env.Name)
+	// 	return echo.NewHTTPError(http.StatusConflict, "environment already exists")
+	// }
 
 	// convert the model to the CRD
 	pe, err := convertFromEnvironment(&env)
@@ -77,7 +79,8 @@ func (s Server) PostEnvironment(c echo.Context) error {
 	}
 
 	// load the created environment
-	pe, err = s.kubeClient.PreviewEnvironmentByName(c.Request().Context(), env.Name)
+	// TODO: fix this
+	pe, err = s.kubeClient.PreviewEnvironmentById(c.Request().Context(), types.UID(""), "")
 	if err != nil {
 		s.log.Error(err, "failed to get environment by name after creation")
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
@@ -88,16 +91,15 @@ func (s Server) PostEnvironment(c echo.Context) error {
 
 // Deletes an environment
 // (DELETE /environment/{name})
-func (s Server) DeleteEnvironmentName(c echo.Context, name string) error {
-
+func (s Server) DeleteEnvironmentOwnerId(c echo.Context, owner string, id string) error {
 	// delete the environment
-	pe, err := s.kubeClient.DeletePreviewEnvironment(c.Request().Context(), name)
+	pe, err := s.kubeClient.DeletePreviewEnvironment(c.Request().Context(), types.UID(id), owner)
 	if err != nil {
 		if client.IgnoreNotFound(err) != nil {
 			s.log.Error(err, "failed to delete environment")
 			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
-		s.log.Info("environment not found", "name", name)
+		s.log.Info("environment not found", "id", id, "owner", owner)
 		return echo.NewHTTPError(http.StatusNotFound, "environment not found")
 	}
 
@@ -106,6 +108,7 @@ func (s Server) DeleteEnvironmentName(c echo.Context, name string) error {
 
 func convertToEnvironmentModel(in *coflnetv1alpha1.PreviewEnvironment) *environmentModel {
 	return &environmentModel{
+		Id:   in.GetUID(),
 		Name: in.Name,
 		GitSettings: gitSettingsModel{
 			Organization: in.Spec.GitOrganization,

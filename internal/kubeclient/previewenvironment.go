@@ -4,6 +4,9 @@ import (
 	"context"
 
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -21,16 +24,26 @@ func (k *KubeClient) ListPreviewEnvironments(ctx context.Context) (*coflnetv1alp
 	return &peiList, nil
 }
 
-func (k *KubeClient) PreviewEnvironmentByName(ctx context.Context, name string) (*coflnetv1alpha1.PreviewEnvironment, error) {
-	k.log.Info("Getting PreviewEnvironment from the cluster", "name", name)
+func (k *KubeClient) PreviewEnvironmentById(ctx context.Context, id types.UID, owner string) (*coflnetv1alpha1.PreviewEnvironment, error) {
+	k.log.Info("Getting PreviewEnvironment from the cluster", "id", id)
 
-	var pe coflnetv1alpha1.PreviewEnvironment
+	var peList coflnetv1alpha1.PreviewEnvironmentList
 
-	err := k.kClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, &pe)
+	err := k.kClient.List(ctx, &peList, &client.ListOptions{
+		Namespace:     namespace,
+		LabelSelector: labels.Set(map[string]string{"owner": owner}).AsSelector(),
+	})
 	if err != nil {
 		return nil, err
 	}
-	return &pe, nil
+
+	for _, pe := range peList.Items {
+		if pe.GetUID() == id {
+			return &pe, nil
+		}
+	}
+
+	return nil, errors.NewNotFound(coflnetv1alpha1.PreviewEnvironmentGVR.GroupResource(), string(id))
 }
 
 func (k *KubeClient) CreatePreviewEnvironment(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment) error {
@@ -44,9 +57,9 @@ func (k *KubeClient) CreatePreviewEnvironment(ctx context.Context, pe *coflnetv1
 	return nil
 }
 
-func (k *KubeClient) DeletePreviewEnvironment(ctx context.Context, name string) (*coflnetv1alpha1.PreviewEnvironment, error) {
-	k.log.Info("Deleting PreviewEnvironment from the cluster", "name", name)
-	pe, err := k.PreviewEnvironmentByName(ctx, name)
+func (k *KubeClient) DeletePreviewEnvironment(ctx context.Context, id types.UID, owner string) (*coflnetv1alpha1.PreviewEnvironment, error) {
+	k.log.Info("Deleting PreviewEnvironment from the cluster", "id", id)
+	pe, err := k.PreviewEnvironmentById(ctx, id, owner)
 	if err != nil {
 		return nil, err
 	}

@@ -49,16 +49,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/server.httpError'
       x-codegen-request-body-name: environment
-  /environment-instance/list/{name}:
+  /environment-instance/list/{owner}:
     get:
       tags:
       - environmentinstance
       summary: Lists all instances of an environment
-      description: Lists all instances of an environment by the environment name
+      description: Lists all instances of an environment by the environment id
       parameters:
-      - name: name
+      - name: owner
         in: path
-        description: Name of the environment
+        description: Owner of the environment
         required: true
         schema:
           type: string
@@ -83,16 +83,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/server.httpError'
-  /environment/{name}:
+  /environment/{owner}/{id}:
     delete:
       tags:
       - environment
       summary: Deletes an environment
-      description: Deletes an environment based on the name
+      description: Deletes an environment based on the id
       parameters:
-      - name: name
+      - name: id
         in: path
-        description: Name of the environment to delete
+        description: Id of the environment to delete
+        required: true
+        schema:
+          type: string
+      - name: owner
+        in: path
+        description: Owner of the environment
         required: true
         schema:
           type: string
@@ -147,6 +153,8 @@ components:
         gitSettings:
           $ref: '#/components/schemas/server.gitSettingsModel'
         name:
+          type: string
+        id:
           type: string
     server.gitSettingsModel:
       type: object

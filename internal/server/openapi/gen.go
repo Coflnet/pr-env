@@ -28,6 +28,7 @@ type ServerEnvironmentModel struct {
 	ApplicationSettings *ServerApplicationSettingsModel `json:"applicationSettings,omitempty"`
 	ContainerSettings   *ServerContainerSettingsModel   `json:"containerSettings,omitempty"`
 	GitSettings         *ServerGitSettingsModel         `json:"gitSettings,omitempty"`
+	Id                  *string                         `json:"id,omitempty"`
 	Name                *string                         `json:"name,omitempty"`
 }
 
@@ -51,14 +52,14 @@ type ServerInterface interface {
 	// (POST /environment)
 	PostEnvironment(ctx echo.Context) error
 	// Lists all instances of an environment
-	// (GET /environment-instance/list/{name})
-	GetEnvironmentInstanceListName(ctx echo.Context, name string) error
+	// (GET /environment-instance/list/{owner})
+	GetEnvironmentInstanceListOwner(ctx echo.Context, owner string) error
 	// List all available Environments
 	// (GET /environment/list)
 	GetEnvironmentList(ctx echo.Context) error
 	// Deletes an environment
-	// (DELETE /environment/{name})
-	DeleteEnvironmentName(ctx echo.Context, name string) error
+	// (DELETE /environment/{owner}/{id})
+	DeleteEnvironmentOwnerId(ctx echo.Context, owner string, id string) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -75,19 +76,19 @@ func (w *ServerInterfaceWrapper) PostEnvironment(ctx echo.Context) error {
 	return err
 }
 
-// GetEnvironmentInstanceListName converts echo context to params.
-func (w *ServerInterfaceWrapper) GetEnvironmentInstanceListName(ctx echo.Context) error {
+// GetEnvironmentInstanceListOwner converts echo context to params.
+func (w *ServerInterfaceWrapper) GetEnvironmentInstanceListOwner(ctx echo.Context) error {
 	var err error
-	// ------------- Path parameter "name" -------------
-	var name string
+	// ------------- Path parameter "owner" -------------
+	var owner string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "name", ctx.Param("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "owner", ctx.Param("owner"), &owner, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter name: %s", err))
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter owner: %s", err))
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GetEnvironmentInstanceListName(ctx, name)
+	err = w.Handler.GetEnvironmentInstanceListOwner(ctx, owner)
 	return err
 }
 
@@ -100,19 +101,27 @@ func (w *ServerInterfaceWrapper) GetEnvironmentList(ctx echo.Context) error {
 	return err
 }
 
-// DeleteEnvironmentName converts echo context to params.
-func (w *ServerInterfaceWrapper) DeleteEnvironmentName(ctx echo.Context) error {
+// DeleteEnvironmentOwnerId converts echo context to params.
+func (w *ServerInterfaceWrapper) DeleteEnvironmentOwnerId(ctx echo.Context) error {
 	var err error
-	// ------------- Path parameter "name" -------------
-	var name string
+	// ------------- Path parameter "owner" -------------
+	var owner string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "name", ctx.Param("name"), &name, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "owner", ctx.Param("owner"), &owner, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter name: %s", err))
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter owner: %s", err))
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.DeleteEnvironmentName(ctx, name)
+	err = w.Handler.DeleteEnvironmentOwnerId(ctx, owner, id)
 	return err
 }
 
@@ -145,8 +154,8 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	}
 
 	router.POST(baseURL+"/environment", wrapper.PostEnvironment)
-	router.GET(baseURL+"/environment-instance/list/:name", wrapper.GetEnvironmentInstanceListName)
+	router.GET(baseURL+"/environment-instance/list/:owner", wrapper.GetEnvironmentInstanceListOwner)
 	router.GET(baseURL+"/environment/list", wrapper.GetEnvironmentList)
-	router.DELETE(baseURL+"/environment/:name", wrapper.DeleteEnvironmentName)
+	router.DELETE(baseURL+"/environment/:owner/:id", wrapper.DeleteEnvironmentOwnerId)
 
 }
