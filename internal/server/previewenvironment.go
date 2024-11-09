@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
+	apigen "github.com/coflnet/pr-env/internal/server/openapi"
 	"github.com/labstack/echo/v4"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -35,7 +36,7 @@ type applicationSettingsModel struct {
 
 // List all available Environments
 // (GET /environment/list)
-func (s Server) GetEnvironmentList(c echo.Context) error {
+func (s Server) GetEnvironmentList(c echo.Context, p apigen.GetEnvironmentListParams) error {
 	list, err := s.kubeClient.ListPreviewEnvironments(c.Request().Context())
 	if err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
@@ -46,7 +47,7 @@ func (s Server) GetEnvironmentList(c echo.Context) error {
 
 // Creates a new environment
 // (POST /environment)
-func (s Server) PostEnvironment(c echo.Context) error {
+func (s Server) PostEnvironment(c echo.Context, p apigen.PostEnvironmentParams) error {
 	var env environmentModel
 	if err := c.Bind(&env); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -91,7 +92,7 @@ func (s Server) PostEnvironment(c echo.Context) error {
 
 // Deletes an environment
 // (DELETE /environment/{name})
-func (s Server) DeleteEnvironmentOwnerId(c echo.Context, owner string, id string) error {
+func (s Server) DeleteEnvironmentOwnerId(c echo.Context, owner string, id string, p apigen.DeleteEnvironmentOwnerIdParams) error {
 	// delete the environment
 	pe, err := s.kubeClient.DeletePreviewEnvironment(c.Request().Context(), types.UID(id), owner)
 	if err != nil {

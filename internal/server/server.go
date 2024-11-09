@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"os"
 	"strconv"
 
@@ -26,6 +27,11 @@ func NewServer(logger *logr.Logger, githubClient *git.GithubClient, kubeClient *
 	}
 
 	e := echo.New()
+	authMiddleware, err := newAuthenticationMiddleware(context.TODO())
+	if err != nil {
+		panic(err)
+	}
+
 	e.Use(middleware.Recover())
 	e.Use(middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
 		LogURI:    true,
@@ -42,7 +48,11 @@ func NewServer(logger *logr.Logger, githubClient *git.GithubClient, kubeClient *
 		},
 	}))
 	e.Use(middleware.CORSWithConfig(middleware.DefaultCORSConfig))
+	e.Use(authMiddleware.Process)
 
+	e.Static("/", "internal/server/static")
+	e.GET("/login", authMiddleware.loginHandler)
+	e.GET("/auth/callback", authMiddleware.callbackHandler)
 	e.Static("/api/openapi", "internal/server/openapi")
 
 	apigen.RegisterHandlersWithBaseURL(e, *s, "/api/v1")

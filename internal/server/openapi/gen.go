@@ -43,6 +43,30 @@ type ServerHttpError struct {
 	Message *map[string]interface{} `json:"message,omitempty"`
 }
 
+// PostEnvironmentParams defines parameters for PostEnvironment.
+type PostEnvironmentParams struct {
+	// Authentication Authentication token
+	Authentication string `json:"authentication"`
+}
+
+// GetEnvironmentInstanceListOwnerParams defines parameters for GetEnvironmentInstanceListOwner.
+type GetEnvironmentInstanceListOwnerParams struct {
+	// Authentication Authentication token
+	Authentication string `json:"authentication"`
+}
+
+// GetEnvironmentListParams defines parameters for GetEnvironmentList.
+type GetEnvironmentListParams struct {
+	// Authentication Authentication token
+	Authentication string `json:"authentication"`
+}
+
+// DeleteEnvironmentOwnerIdParams defines parameters for DeleteEnvironmentOwnerId.
+type DeleteEnvironmentOwnerIdParams struct {
+	// Authentication Authentication token
+	Authentication string `json:"authentication"`
+}
+
 // PostEnvironmentJSONRequestBody defines body for PostEnvironment for application/json ContentType.
 type PostEnvironmentJSONRequestBody = ServerEnvironmentModel
 
@@ -50,16 +74,16 @@ type PostEnvironmentJSONRequestBody = ServerEnvironmentModel
 type ServerInterface interface {
 	// Creates a new environment
 	// (POST /environment)
-	PostEnvironment(ctx echo.Context) error
+	PostEnvironment(ctx echo.Context, params PostEnvironmentParams) error
 	// Lists all instances of an environment
 	// (GET /environment-instance/list/{owner})
-	GetEnvironmentInstanceListOwner(ctx echo.Context, owner string) error
+	GetEnvironmentInstanceListOwner(ctx echo.Context, owner string, params GetEnvironmentInstanceListOwnerParams) error
 	// List all available Environments
 	// (GET /environment/list)
-	GetEnvironmentList(ctx echo.Context) error
+	GetEnvironmentList(ctx echo.Context, params GetEnvironmentListParams) error
 	// Deletes an environment
 	// (DELETE /environment/{owner}/{id})
-	DeleteEnvironmentOwnerId(ctx echo.Context, owner string, id string) error
+	DeleteEnvironmentOwnerId(ctx echo.Context, owner string, id string, params DeleteEnvironmentOwnerIdParams) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -71,8 +95,30 @@ type ServerInterfaceWrapper struct {
 func (w *ServerInterfaceWrapper) PostEnvironment(ctx echo.Context) error {
 	var err error
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PostEnvironmentParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "authentication" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("authentication")]; found {
+		var Authentication string
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for authentication, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "authentication", valueList[0], &Authentication, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter authentication: %s", err))
+		}
+
+		params.Authentication = Authentication
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter authentication is required, but not found"))
+	}
+
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.PostEnvironment(ctx)
+	err = w.Handler.PostEnvironment(ctx, params)
 	return err
 }
 
@@ -87,8 +133,30 @@ func (w *ServerInterfaceWrapper) GetEnvironmentInstanceListOwner(ctx echo.Contex
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter owner: %s", err))
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetEnvironmentInstanceListOwnerParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "authentication" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("authentication")]; found {
+		var Authentication string
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for authentication, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "authentication", valueList[0], &Authentication, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter authentication: %s", err))
+		}
+
+		params.Authentication = Authentication
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter authentication is required, but not found"))
+	}
+
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GetEnvironmentInstanceListOwner(ctx, owner)
+	err = w.Handler.GetEnvironmentInstanceListOwner(ctx, owner, params)
 	return err
 }
 
@@ -96,8 +164,30 @@ func (w *ServerInterfaceWrapper) GetEnvironmentInstanceListOwner(ctx echo.Contex
 func (w *ServerInterfaceWrapper) GetEnvironmentList(ctx echo.Context) error {
 	var err error
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetEnvironmentListParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "authentication" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("authentication")]; found {
+		var Authentication string
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for authentication, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "authentication", valueList[0], &Authentication, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter authentication: %s", err))
+		}
+
+		params.Authentication = Authentication
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter authentication is required, but not found"))
+	}
+
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GetEnvironmentList(ctx)
+	err = w.Handler.GetEnvironmentList(ctx, params)
 	return err
 }
 
@@ -120,8 +210,30 @@ func (w *ServerInterfaceWrapper) DeleteEnvironmentOwnerId(ctx echo.Context) erro
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DeleteEnvironmentOwnerIdParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "authentication" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("authentication")]; found {
+		var Authentication string
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for authentication, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "authentication", valueList[0], &Authentication, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter authentication: %s", err))
+		}
+
+		params.Authentication = Authentication
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter authentication is required, but not found"))
+	}
+
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.DeleteEnvironmentOwnerId(ctx, owner, id)
+	err = w.Handler.DeleteEnvironmentOwnerId(ctx, owner, id, params)
 	return err
 }
 

@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
+	apigen "github.com/coflnet/pr-env/internal/server/openapi"
 	"github.com/labstack/echo/v4"
 )
 
@@ -52,7 +53,7 @@ func convertToEnvironmentInstanceModel(in *coflnetv1alpha1.PreviewEnvironmentIns
 
 // List all available Environments
 // (GET /environment/list)
-func (s Server) GetEnvironmentInstanceListOwner(c echo.Context, owner string) error {
+func (s Server) GetEnvironmentInstanceListOwner(c echo.Context, owner string, p apigen.GetEnvironmentInstanceListOwnerParams) error {
 	list, err := s.kubeClient.ListPreviewEnvironmentInstances(c.Request().Context(), owner)
 	if err != nil {
 		return echo.NewHTTPError(500, err.Error())

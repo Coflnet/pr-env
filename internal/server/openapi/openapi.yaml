@@ -14,6 +14,13 @@ paths:
       - environment
       summary: Creates a new environment
       description: Creates a new environment
+      parameters:
+      - name: authentication
+        in: header
+        description: Authentication token
+        required: true
+        schema:
+          type: string
       requestBody:
         description: Environment to create
         content:
@@ -62,12 +69,25 @@ paths:
         required: true
         schema:
           type: string
+      - name: authentication
+        in: header
+        description: Authentication token
+        required: true
+        schema:
+          type: string
   /environment/list:
     get:
       tags:
       - environment
       summary: List all available Environments
       description: List of all environments the user has access to
+      parameters:
+      - name: authentication
+        in: header
+        description: Authentication token
+        required: true
+        schema:
+          type: string
       responses:
         "200":
           description: OK
@@ -99,6 +119,12 @@ paths:
       - name: owner
         in: path
         description: Owner of the environment
+        required: true
+        schema:
+          type: string
+      - name: authentication
+        in: header
+        description: Authentication token
         required: true
         schema:
           type: string
