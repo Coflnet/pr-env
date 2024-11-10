@@ -13,19 +13,23 @@ import (
 // TODO: figure out how to handle namespaces
 const namespace = "default"
 
-func (k *KubeClient) ListPreviewEnvironments(ctx context.Context) (*coflnetv1alpha1.PreviewEnvironmentList, error) {
+func (k *KubeClient) ListPreviewEnvironments(ctx context.Context, owner string) (*coflnetv1alpha1.PreviewEnvironmentList, error) {
 	k.log.Info("Listing PreviewEnvironments from the cluster")
 
 	var peiList coflnetv1alpha1.PreviewEnvironmentList
-	err := k.kClient.List(ctx, &peiList, &client.ListOptions{})
+	err := k.kClient.List(ctx, &peiList, &client.ListOptions{
+		Namespace:     namespace,
+		LabelSelector: labels.Set(map[string]string{"owner": owner}).AsSelector(),
+	})
+
 	if err != nil {
 		return nil, err
 	}
 	return &peiList, nil
 }
 
-func (k *KubeClient) PreviewEnvironmentById(ctx context.Context, id types.UID, owner string) (*coflnetv1alpha1.PreviewEnvironment, error) {
-	k.log.Info("Getting PreviewEnvironment from the cluster", "id", id)
+func (k *KubeClient) PreviewEnvironmentOfUser(ctx context.Context, owner string) (*coflnetv1alpha1.PreviewEnvironmentList, error) {
+	k.log.Info("Getting PreviewEnvironment from the cluster", "user", owner)
 
 	var peList coflnetv1alpha1.PreviewEnvironmentList
 
@@ -33,17 +37,63 @@ func (k *KubeClient) PreviewEnvironmentById(ctx context.Context, id types.UID, o
 		Namespace:     namespace,
 		LabelSelector: labels.Set(map[string]string{"owner": owner}).AsSelector(),
 	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &peList, nil
+}
+
+func (k *KubeClient) PreviewEnvironmentById(ctx context.Context, owner string, id types.UID) (*coflnetv1alpha1.PreviewEnvironment, error) {
+	k.log.Info("Getting PreviewEnvironment from the cluster", "owner", owner, "id", id)
+
+	peList, err := k.PreviewEnvironmentOfUser(ctx, owner)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, pe := range peList.Items {
-		if pe.GetUID() == id {
+		if pe.UID == id {
 			return &pe, nil
 		}
 	}
 
 	return nil, errors.NewNotFound(coflnetv1alpha1.PreviewEnvironmentGVR.GroupResource(), string(id))
+}
+
+func (k *KubeClient) PreviewEnvironmentByName(ctx context.Context, owner, name string) (*coflnetv1alpha1.PreviewEnvironment, error) {
+	k.log.Info("Getting PreviewEnvironment from the cluster", "owner", owner, "name", name)
+
+	peList, err := k.PreviewEnvironmentOfUser(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, pe := range peList.Items {
+		if pe.Name == name {
+			return &pe, nil
+		}
+	}
+
+	return nil, errors.NewNotFound(coflnetv1alpha1.PreviewEnvironmentGVR.GroupResource(), name)
+}
+
+func (k *KubeClient) PreviewEnvironmentByDisplayName(ctx context.Context, owner, displayName string) (*coflnetv1alpha1.PreviewEnvironment, error) {
+	k.log.Info("Getting PreviewEnvironment from the cluster", "owner", owner, "displayName", displayName)
+
+	peList, err := k.PreviewEnvironmentOfUser(ctx, owner)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, pe := range peList.Items {
+		if pe.Spec.DisplayName == displayName {
+			return &pe, nil
+		}
+	}
+
+	return nil, errors.NewNotFound(coflnetv1alpha1.PreviewEnvironmentGVR.GroupResource(), displayName)
 }
 
 func (k *KubeClient) CreatePreviewEnvironment(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment) error {
@@ -57,9 +107,9 @@ func (k *KubeClient) CreatePreviewEnvironment(ctx context.Context, pe *coflnetv1
 	return nil
 }
 
-func (k *KubeClient) DeletePreviewEnvironment(ctx context.Context, id types.UID, owner string) (*coflnetv1alpha1.PreviewEnvironment, error) {
+func (k *KubeClient) DeletePreviewEnvironment(ctx context.Context, owner string, id types.UID) (*coflnetv1alpha1.PreviewEnvironment, error) {
 	k.log.Info("Deleting PreviewEnvironment from the cluster", "id", id)
-	pe, err := k.PreviewEnvironmentById(ctx, id, owner)
+	pe, err := k.PreviewEnvironmentById(ctx, owner, id)
 	if err != nil {
 		return nil, err
 	}

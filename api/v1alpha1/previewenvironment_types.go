@@ -17,6 +17,9 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
+	"strings"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -51,6 +54,10 @@ type PreviewEnvironmentSpec struct {
 	// +optional
 	// ApplicationSettings configuration for the running application
 	ApplicationSettings ApplicationSettings `json:"applicationSettings"`
+
+	// +optional
+	// DisplayName is the name that can be displayed to the user
+	DisplayName string `json:"displayName"`
 }
 
 type PreviewEnvironmentRef struct {
@@ -100,6 +107,11 @@ type PreviewEnvironmentList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []PreviewEnvironment `json:"items"`
+}
+
+func PreviewEnvironmentName(organization, repo string) string {
+	str := fmt.Sprintf("%s-%s", organization, repo)
+	return strings.ToLower(str)
 }
 
 func init() {

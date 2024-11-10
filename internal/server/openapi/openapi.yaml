@@ -103,7 +103,7 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/server.httpError'
-  /environment/{owner}/{id}:
+  /environment/{id}:
     delete:
       tags:
       - environment
@@ -113,12 +113,6 @@ paths:
       - name: id
         in: path
         description: Id of the environment to delete
-        required: true
-        schema:
-          type: string
-      - name: owner
-        in: path
-        description: Owner of the environment
         required: true
         schema:
           type: string

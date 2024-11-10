@@ -61,8 +61,8 @@ type GetEnvironmentListParams struct {
 	Authentication string `json:"authentication"`
 }
 
-// DeleteEnvironmentOwnerIdParams defines parameters for DeleteEnvironmentOwnerId.
-type DeleteEnvironmentOwnerIdParams struct {
+// DeleteEnvironmentIdParams defines parameters for DeleteEnvironmentId.
+type DeleteEnvironmentIdParams struct {
 	// Authentication Authentication token
 	Authentication string `json:"authentication"`
 }
@@ -82,8 +82,8 @@ type ServerInterface interface {
 	// (GET /environment/list)
 	GetEnvironmentList(ctx echo.Context, params GetEnvironmentListParams) error
 	// Deletes an environment
-	// (DELETE /environment/{owner}/{id})
-	DeleteEnvironmentOwnerId(ctx echo.Context, owner string, id string, params DeleteEnvironmentOwnerIdParams) error
+	// (DELETE /environment/{id})
+	DeleteEnvironmentId(ctx echo.Context, id string, params DeleteEnvironmentIdParams) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -191,17 +191,9 @@ func (w *ServerInterfaceWrapper) GetEnvironmentList(ctx echo.Context) error {
 	return err
 }
 
-// DeleteEnvironmentOwnerId converts echo context to params.
-func (w *ServerInterfaceWrapper) DeleteEnvironmentOwnerId(ctx echo.Context) error {
+// DeleteEnvironmentId converts echo context to params.
+func (w *ServerInterfaceWrapper) DeleteEnvironmentId(ctx echo.Context) error {
 	var err error
-	// ------------- Path parameter "owner" -------------
-	var owner string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "owner", ctx.Param("owner"), &owner, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter owner: %s", err))
-	}
-
 	// ------------- Path parameter "id" -------------
 	var id string
 
@@ -211,7 +203,7 @@ func (w *ServerInterfaceWrapper) DeleteEnvironmentOwnerId(ctx echo.Context) erro
 	}
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params DeleteEnvironmentOwnerIdParams
+	var params DeleteEnvironmentIdParams
 
 	headers := ctx.Request().Header
 	// ------------- Required header parameter "authentication" -------------
@@ -233,7 +225,7 @@ func (w *ServerInterfaceWrapper) DeleteEnvironmentOwnerId(ctx echo.Context) erro
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.DeleteEnvironmentOwnerId(ctx, owner, id, params)
+	err = w.Handler.DeleteEnvironmentId(ctx, id, params)
 	return err
 }
 
@@ -268,6 +260,6 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.POST(baseURL+"/environment", wrapper.PostEnvironment)
 	router.GET(baseURL+"/environment-instance/list/:owner", wrapper.GetEnvironmentInstanceListOwner)
 	router.GET(baseURL+"/environment/list", wrapper.GetEnvironmentList)
-	router.DELETE(baseURL+"/environment/:owner/:id", wrapper.DeleteEnvironmentOwnerId)
+	router.DELETE(baseURL+"/environment/:id", wrapper.DeleteEnvironmentId)
 
 }

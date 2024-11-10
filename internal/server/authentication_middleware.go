@@ -81,40 +81,34 @@ func (c *oidcConfig) readInConfig() error {
 func (m *authenticationMiddleware) Process(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 
-		// check if the route is the login route
-		// TODO: cleanup
-		if c.Path() == "/login" {
-			return next(c)
-		}
-		if c.Path() == "/auth/callback" {
-			return next(c)
-		}
-
 		// make sure the user is authenticated
 		// if not we redirect the user to the login page
-		authHeaderVal := c.Request().Header.Get("Authentication")
+		authHeaderVal := c.Request().Header.Get("authentication")
 		if authHeaderVal == "" {
-
 			authCookie, err := c.Cookie("access_token")
 			if err != nil {
-				return c.Redirect(http.StatusTemporaryRedirect, "/login")
+				return c.String(http.StatusUnauthorized, "missing access token")
 			}
 
-			fmt.Println("authCookie.Value")
-			fmt.Println(authCookie.Value)
-
 			if authCookie.Value == "" {
-				return c.Redirect(http.StatusTemporaryRedirect, "/login")
+				return c.String(http.StatusUnauthorized, "empty access token")
 			}
 			authHeaderVal = authCookie.Value
 		}
 
 		// validate the token
-		_, err := m.oauthProvider.Verifier(&oidc.Config{ClientID: m.oauthConfig.ClientID}).Verify(c.Request().Context(), authHeaderVal)
+		token, err := m.oauthProvider.Verifier(&oidc.Config{ClientID: m.oauthConfig.ClientID}).Verify(c.Request().Context(), authHeaderVal)
 		if err != nil {
-			fmt.Println("error validating token")
 			fmt.Println(err)
+			return c.String(http.StatusUnauthorized, fmt.Sprintf("invalid token: %v", err))
 		}
+
+		if token.Subject == "" {
+			return c.String(http.StatusUnauthorized, "missing user id")
+		}
+
+		// add the user id to the context
+		c.Set("user", token.Subject)
 
 		return next(c)
 	}
