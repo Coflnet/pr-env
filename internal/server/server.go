@@ -50,11 +50,16 @@ func NewServer(logger *logr.Logger, githubClient *git.GithubClient, kubeClient *
 	e.Use(middleware.CORSWithConfig(middleware.DefaultCORSConfig))
 	e.Use(authMiddleware.Process)
 
+	// authentication routes
+	// those are not listed in the openapi spec
 	e.Static("/", "internal/server/static")
 	e.GET("/login", authMiddleware.loginHandler)
 	e.GET("/auth/callback", authMiddleware.callbackHandler)
+
+	// openapi spec
 	e.Static("/api/openapi", "internal/server/openapi")
 
+	// everything else
 	apigen.RegisterHandlersWithBaseURL(e, *s, "/api/v1")
 
 	return e
