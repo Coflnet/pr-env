@@ -49,8 +49,8 @@ type PostEnvironmentParams struct {
 	Authentication string `json:"authentication"`
 }
 
-// GetEnvironmentInstanceListOwnerParams defines parameters for GetEnvironmentInstanceListOwner.
-type GetEnvironmentInstanceListOwnerParams struct {
+// GetEnvironmentInstanceIdListParams defines parameters for GetEnvironmentInstanceIdList.
+type GetEnvironmentInstanceIdListParams struct {
 	// Authentication Authentication token
 	Authentication string `json:"authentication"`
 }
@@ -76,8 +76,8 @@ type ServerInterface interface {
 	// (POST /environment)
 	PostEnvironment(ctx echo.Context, params PostEnvironmentParams) error
 	// Lists all instances of an environment
-	// (GET /environment-instance/list/{owner})
-	GetEnvironmentInstanceListOwner(ctx echo.Context, owner string, params GetEnvironmentInstanceListOwnerParams) error
+	// (GET /environment-instance/{id}/list)
+	GetEnvironmentInstanceIdList(ctx echo.Context, id string, params GetEnvironmentInstanceIdListParams) error
 	// List all available Environments
 	// (GET /environment/list)
 	GetEnvironmentList(ctx echo.Context, params GetEnvironmentListParams) error
@@ -122,19 +122,19 @@ func (w *ServerInterfaceWrapper) PostEnvironment(ctx echo.Context) error {
 	return err
 }
 
-// GetEnvironmentInstanceListOwner converts echo context to params.
-func (w *ServerInterfaceWrapper) GetEnvironmentInstanceListOwner(ctx echo.Context) error {
+// GetEnvironmentInstanceIdList converts echo context to params.
+func (w *ServerInterfaceWrapper) GetEnvironmentInstanceIdList(ctx echo.Context) error {
 	var err error
-	// ------------- Path parameter "owner" -------------
-	var owner string
+	// ------------- Path parameter "id" -------------
+	var id string
 
-	err = runtime.BindStyledParameterWithOptions("simple", "owner", ctx.Param("owner"), &owner, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	err = runtime.BindStyledParameterWithOptions("simple", "id", ctx.Param("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
 	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter owner: %s", err))
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter id: %s", err))
 	}
 
 	// Parameter object where we will unmarshal all parameters from the context
-	var params GetEnvironmentInstanceListOwnerParams
+	var params GetEnvironmentInstanceIdListParams
 
 	headers := ctx.Request().Header
 	// ------------- Required header parameter "authentication" -------------
@@ -156,7 +156,7 @@ func (w *ServerInterfaceWrapper) GetEnvironmentInstanceListOwner(ctx echo.Contex
 	}
 
 	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GetEnvironmentInstanceListOwner(ctx, owner, params)
+	err = w.Handler.GetEnvironmentInstanceIdList(ctx, id, params)
 	return err
 }
 
@@ -258,7 +258,7 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	}
 
 	router.POST(baseURL+"/environment", wrapper.PostEnvironment)
-	router.GET(baseURL+"/environment-instance/list/:owner", wrapper.GetEnvironmentInstanceListOwner)
+	router.GET(baseURL+"/environment-instance/:id/list", wrapper.GetEnvironmentInstanceIdList)
 	router.GET(baseURL+"/environment/list", wrapper.GetEnvironmentList)
 	router.DELETE(baseURL+"/environment/:id", wrapper.DeleteEnvironmentId)
 

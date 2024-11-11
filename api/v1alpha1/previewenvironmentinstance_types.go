@@ -42,10 +42,6 @@ type PreviewEnvironmentInstanceSpec struct {
 	GitRepository string `json:"gitRepository"`
 
 	// +optional
-	// PreviewEnvironmentRef is the reference to the PreviewEnvironment object
-	PreviewEnvironmentRef PreviewEnvironmentRef `json:"previewEnvironmentRef"`
-
-	// +optional
 	// CommitHash the last commit hash, this should be the version that the instance is running
 	CommitHash string `json:"commitHash"`
 }

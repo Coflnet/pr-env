@@ -70,6 +70,10 @@ spec:
                 - registry
                 - repository
                 type: object
+              displayName:
+                description: DisplayName is the name that can be displayed to the
+                  user
+                type: string
               gitOrganization:
                 maxLength: 63
                 minLength: 0

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/coreos/go-oidc/v3/oidc"
@@ -80,6 +81,10 @@ func (c *oidcConfig) readInConfig() error {
 
 func (m *authenticationMiddleware) Process(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
+
+		if strings.HasPrefix(c.Path(), "/api/openapi") {
+			return next(c)
+		}
 
 		// make sure the user is authenticated
 		// if not we redirect the user to the login page

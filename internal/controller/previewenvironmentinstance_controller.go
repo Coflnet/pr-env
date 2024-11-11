@@ -20,6 +20,7 @@ import (
 	"context"
 	"time"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -82,10 +83,9 @@ func (r *PreviewEnvironmentInstanceReconciler) Reconcile(ctx context.Context, re
 		}
 	}
 
-	var pe coflnetv1alpha1.PreviewEnvironment
-	if err := r.Get(ctx, client.ObjectKey{Name: pei.Spec.PreviewEnvironmentRef.Name, Namespace: pei.Spec.PreviewEnvironmentRef.Namespace}, &pe); err != nil {
-		r.log.Error(err, "unable to load the PreviewEnvironment", "namespace", pei.Namespace, "name", pei.Name)
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+	pe, err := r.loadPreviewEnvironmentForInstance(ctx, &pei)
+	if err != nil {
+		return ctrl.Result{}, err
 	}
 
 	if pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusBuilding || pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusDeploying {
@@ -94,7 +94,7 @@ func (r *PreviewEnvironmentInstanceReconciler) Reconcile(ctx context.Context, re
 	}
 
 	if pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusBuildingOutdated || pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusFailed || pei.Status.RebuildStatus == "" {
-		err := r.rebuildInstance(ctx, &pe, &pei)
+		err := r.rebuildInstance(ctx, pe, &pei)
 		if err != nil {
 			r.log.Error(err, "unable to rebuild the PreviewEnvironmentInstance", "namespace", pei.Namespace, "name", pei.Name)
 			err = r.markPreviewEnvironmentInstanceAsFailed(ctx, &pei)
@@ -121,7 +121,7 @@ func (r *PreviewEnvironmentInstanceReconciler) Reconcile(ctx context.Context, re
 
 	if pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusDeploymentOutdated {
 		r.log.Info("instance is being redeployed", "namespace", pei.Namespace, "name", pei.Name)
-		err := r.redeployInstance(ctx, &pe, &pei)
+		err := r.redeployInstance(ctx, pe, &pei)
 		if err != nil {
 			r.log.Error(err, "unable to redeploy the PreviewEnvironmentInstance", "namespace", pei.Namespace, "name", pei.Name)
 			err = r.markPreviewEnvironmentInstanceAsFailed(ctx, &pei)
@@ -139,7 +139,7 @@ func (r *PreviewEnvironmentInstanceReconciler) Reconcile(ctx context.Context, re
 		}
 
 		r.log.Info("updating github pull request", "namespace", pei.Namespace, "name", pei.Name)
-		if err := r.githubClient.UpdatePullRequestAnswer(ctx, &pe, &pei); err != nil {
+		if err := r.githubClient.UpdatePullRequestAnswer(ctx, pe, &pei); err != nil {
 			r.log.Error(err, "unable to update the pull request", "namespace", pei.Namespace, "name", pei.Name)
 			return ctrl.Result{RequeueAfter: time.Minute * 1}, nil
 		}
@@ -202,4 +202,23 @@ func (r *PreviewEnvironmentInstanceReconciler) SetupWithManager(mgr ctrl.Manager
 		For(&coflnetv1alpha1.PreviewEnvironmentInstance{}).
 		Named("previewenvironmentinstance").
 		Complete(r)
+}
+
+func (r *PreviewEnvironmentInstanceReconciler) loadPreviewEnvironmentForInstance(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) (*coflnetv1alpha1.PreviewEnvironment, error) {
+	var peList coflnetv1alpha1.PreviewEnvironmentList
+	err := r.List(ctx, &peList, &client.ListOptions{
+		Namespace: pei.GetNamespace(),
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	for _, pe := range peList.Items {
+		if string(pe.GetUID()) == pei.GetLabels()["previewenvironment"] {
+			return &pe, nil
+		}
+	}
+
+	return nil, errors.NewNotFound(coflnetv1alpha1.PreviewEnvironmentGVR.GroupResource(), pei.GetLabels()["previewenvironment"])
 }

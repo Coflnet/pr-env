@@ -6,6 +6,7 @@ import (
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
 	apigen "github.com/coflnet/pr-env/internal/server/openapi"
 	"github.com/labstack/echo/v4"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 type environmentInstanceModel struct {
@@ -53,11 +54,13 @@ func convertToEnvironmentInstanceModel(in *coflnetv1alpha1.PreviewEnvironmentIns
 
 // List all available Environments
 // (GET /environment/list)
-func (s Server) GetEnvironmentInstanceListOwner(c echo.Context, owner string, p apigen.GetEnvironmentInstanceListOwnerParams) error {
-	list, err := s.kubeClient.ListPreviewEnvironmentInstances(c.Request().Context(), owner)
+func (s Server) GetEnvironmentInstanceIdList(c echo.Context, id string, params apigen.GetEnvironmentInstanceIdListParams) error {
+	owner := c.Get("user").(string)
+
+	pei, err := s.kubeClient.ListPreviewEnvironmentInstancesByPreviewEnvironmentId(c.Request().Context(), owner, types.UID(id))
 	if err != nil {
 		return echo.NewHTTPError(500, err.Error())
 	}
 
-	return c.JSON(200, convertToEnvironmentInstanceModelList(list))
+	return c.JSON(200, convertToEnvironmentInstanceModelList(pei))
 }

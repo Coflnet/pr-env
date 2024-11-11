@@ -56,25 +56,6 @@ paths:
               schema:
                 $ref: '#/components/schemas/server.httpError'
       x-codegen-request-body-name: environment
-  /environment-instance/list/{owner}:
-    get:
-      tags:
-      - environmentinstance
-      summary: Lists all instances of an environment
-      description: Lists all instances of an environment by the environment id
-      parameters:
-      - name: owner
-        in: path
-        description: Owner of the environment
-        required: true
-        schema:
-          type: string
-      - name: authentication
-        in: header
-        description: Authentication token
-        required: true
-        schema:
-          type: string
   /environment/list:
     get:
       tags:
@@ -147,6 +128,25 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/server.httpError'
+  /environment-instance/{id}/list:
+    get:
+      tags:
+      - environmentinstance
+      summary: Lists all instances of an environment
+      description: Lists all instances of an environment by the environment id
+      parameters:
+      - name: id
+        in: path
+        description: Id of the environment to list instances
+        required: true
+        schema:
+          type: string
+      - name: authentication
+        in: header
+        description: Authentication token
+        required: true
+        schema:
+          type: string
 components:
   schemas:
     server.applicationSettingsModel:

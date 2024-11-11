@@ -55,22 +55,6 @@ spec:
               gitRepository:
                 description: GitRepository the name of the git repository
                 type: string
-              previewEnvironmentRef:
-                description: PreviewEnvironmentRef is the reference to the PreviewEnvironment
-                  object
-                properties:
-                  name:
-                    maxLength: 63
-                    minLength: 0
-                    type: string
-                  namespace:
-                    maxLength: 63
-                    minLength: 0
-                    type: string
-                required:
-                - name
-                - namespace
-                type: object
               pullRequestNumber:
                 description: PullRequestIdentifier the number of the pull request
                 type: integer

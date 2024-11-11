@@ -123,7 +123,7 @@ func (r *PreviewEnvironmentReconciler) Reconcile(ctx context.Context, req ctrl.R
 func (r *PreviewEnvironmentReconciler) createPreviewEnvironmentInstancesForDetectedPullRequests(ctx context.Context, pr coflnetv1alpha1.PreviewEnvironment, prs []*github.PullRequest) error {
 	for _, githubPr := range prs {
 		peiName := coflnetv1alpha1.PreviewEnvironmentInstanceNameFromPullRequest(pr.Name, pr.Spec.GitOrganization, pr.Spec.GitRepository, int(*githubPr.Number))
-		r.log.Info("check if a preview environment instance already exists", "pei", peiName, "namespace", pr.Namespace)
+		r.log.Info("check if a preview environment instance already exists", "pei", peiName, "namespace", pr.Namespace, "name", peiName, "owner", pr.GetLabels()["owner"])
 
 		pei := coflnetv1alpha1.PreviewEnvironmentInstance{
 			ObjectMeta: metav1.ObjectMeta{
@@ -149,16 +149,16 @@ func (r *PreviewEnvironmentReconciler) createPreviewEnvironmentInstancesForDetec
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      peiName,
 				Namespace: pr.Namespace,
+				Labels: map[string]string{
+					"owner":              pr.GetLabels()["owner"],
+					"previewenvironment": string(pr.GetUID()),
+				},
 			},
 			Spec: coflnetv1alpha1.PreviewEnvironmentInstanceSpec{
 				PullRequestNumber: *githubPr.Number,
 				Branch:            githubPr.Head.Ref,
 				GitOrganization:   pr.Spec.GitOrganization,
 				GitRepository:     pr.Spec.GitRepository,
-				PreviewEnvironmentRef: coflnetv1alpha1.PreviewEnvironmentRef{
-					Name:      pr.Name,
-					Namespace: pr.Namespace,
-				},
 			},
 			Status: coflnetv1alpha1.PreviewEnvironmentInstanceStatus{
 				RebuildStatus: coflnetv1alpha1.RebuildStatusBuildingOutdated,

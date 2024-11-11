@@ -60,16 +60,6 @@ type PreviewEnvironmentSpec struct {
 	DisplayName string `json:"displayName"`
 }
 
-type PreviewEnvironmentRef struct {
-	// +kubebuilder:validation:MinLength=0
-	// +kubebuilder:validation:MaxLength=63
-	Name string `json:"name"`
-
-	// +kubebuilder:validation:MinLength=0
-	// +kubebuilder:validation:MaxLength=63
-	Namespace string `json:"namespace"`
-}
-
 type ContainerRegistry struct {
 	// +kubebuilder:validation:MinLength=0
 	// +kubebuilder:validation:MaxLength=63
