@@ -24,6 +24,11 @@ COPY internal/ internal/
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o manager cmd/main.go
 
 FROM registry.suse.com/bci/bci-micro:15.6
+
+## static files
+RUN mkdir /static
+COPY --from=builder /workspace/internal/server/openapi/openapi.yaml /static/openapi.yaml
+
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532

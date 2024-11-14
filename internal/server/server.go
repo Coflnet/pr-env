@@ -60,7 +60,7 @@ func NewServer(logger *logr.Logger, githubClient *git.GithubClient, kubeClient *
 	e.GET("/auth/callback", authMiddleware.callbackHandler)
 
 	// openapi spec
-	e.Static("/api/openapi", "internal/server/openapi")
+	e.Static("/api/openapi", staticDir())
 
 	e.GET("/api/github/setupUrl", s.ConfigureInstallation)
 
@@ -68,6 +68,14 @@ func NewServer(logger *logr.Logger, githubClient *git.GithubClient, kubeClient *
 	apigen.RegisterHandlersWithBaseURL(e, *s, "/api/v1")
 
 	return e
+}
+
+func staticDir() string {
+	dir := os.Getenv("STATIC_DIR")
+	if dir == "" {
+		return "internal/server/openapi"
+	}
+	return dir
 }
 
 func port() int {
