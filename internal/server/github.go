@@ -2,11 +2,87 @@ package server
 
 import (
 	"context"
+	"strconv"
 	"strings"
 
+	"github.com/coflnet/pr-env/internal/git"
+	"github.com/coflnet/pr-env/internal/keycloak"
+	apigen "github.com/coflnet/pr-env/internal/server/openapi"
 	"github.com/google/go-github/v66/github"
 	"github.com/labstack/echo/v4"
 )
+
+func convertToGithubRepositoryModelList(repos []*github.Repository) []apigen.ServerGithubRepositoryModel {
+	res := make([]apigen.ServerGithubRepositoryModel, len(repos))
+	for i, repo := range repos {
+		res[i] = convertToGithubRepositoryModel(repo)
+	}
+	return res
+}
+
+func convertToGithubRepositoryModel(repo *github.Repository) apigen.ServerGithubRepositoryModel {
+	return apigen.ServerGithubRepositoryModel{
+		Name:  strPtr(repo.GetName()),
+		Owner: strPtr(repo.GetOwner().GetLogin()),
+	}
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
+func (s Server) GetGithubRepositories(c echo.Context, params apigen.GetGithubRepositoriesParams) error {
+	owner := c.Get("user").(string)
+	s.log.Info("Listing Github repositories", "owner", owner)
+
+	installationId, err := s.keycloakClient.GithubInstallationIdForUser(c.Request().Context(), owner)
+	if err != nil {
+		if e, ok := err.(keycloak.InstallationIdDoesNotExistError); ok {
+			s.log.Info("Installation id does not exist", "user", e.UserId)
+			return echo.NewHTTPError(401, "User has no github app connected")
+		}
+
+		s.log.Error(err, "Unable to get Github installation id")
+		return echo.NewHTTPError(500, err.Error())
+	}
+	s.log.Info("Found Github installation id", "id", installationId)
+
+	repos, err := s.githubClient.ListReposOfUser(c.Request().Context(), installationId)
+	if err != nil {
+		s.log.Error(err, "Unable to list repositories")
+		return echo.NewHTTPError(500, err.Error())
+	}
+
+	s.log.Info("Found repositories", "count", len(repos.Repositories))
+	return c.JSON(200, convertToGithubRepositoryModelList(repos.Repositories))
+}
+
+func (s Server) ConfigureInstallation(c echo.Context) error {
+	installationIdStr := c.QueryParam("installation_id")
+	if installationIdStr == "" {
+		return echo.NewHTTPError(400, "installation_id missing")
+	}
+
+	installationId, err := strconv.Atoi(installationIdStr)
+	if err != nil {
+		return echo.NewHTTPError(400, "installation_id is not an integer")
+	}
+
+	s.log.Info("Configuring installation", "id", installationId)
+	err = s.githubClient.ConfigureInstallationById(c.Request().Context(), installationId)
+	if err != nil {
+		if e, ok := err.(git.InstallationIdDoesNotExistError); ok {
+			s.log.Error(e, "Installation id does not exist")
+			return echo.NewHTTPError(404, e.Error())
+		}
+
+		s.log.Error(err, "Unable to configure installation")
+		return echo.NewHTTPError(500, err.Error())
+	}
+
+	s.log.Info("Installation configured", "id", installationId)
+	return c.JSON(200, "ok")
+}
 
 func (s *Server) GithubWebhookHandler(c echo.Context) error {
 	s.log.Info("Received Github Webhook")

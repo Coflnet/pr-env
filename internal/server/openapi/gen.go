@@ -38,6 +38,12 @@ type ServerGitSettingsModel struct {
 	Repository   *string `json:"repository,omitempty"`
 }
 
+// ServerGithubRepositoryModel defines model for server.githubRepositoryModel.
+type ServerGithubRepositoryModel struct {
+	Name  *string `json:"name,omitempty"`
+	Owner *string `json:"owner,omitempty"`
+}
+
 // ServerHttpError defines model for server.httpError.
 type ServerHttpError struct {
 	Message *map[string]interface{} `json:"message,omitempty"`
@@ -67,6 +73,12 @@ type DeleteEnvironmentIdParams struct {
 	Authentication string `json:"authentication"`
 }
 
+// GetGithubRepositoriesParams defines parameters for GetGithubRepositories.
+type GetGithubRepositoriesParams struct {
+	// Authentication Authentication token
+	Authentication string `json:"authentication"`
+}
+
 // PostEnvironmentJSONRequestBody defines body for PostEnvironment for application/json ContentType.
 type PostEnvironmentJSONRequestBody = ServerEnvironmentModel
 
@@ -84,6 +96,9 @@ type ServerInterface interface {
 	// Deletes an environment
 	// (DELETE /environment/{id})
 	DeleteEnvironmentId(ctx echo.Context, id string, params DeleteEnvironmentIdParams) error
+	// Lists all the repositories of the authenticated user
+	// (GET /github/repositories)
+	GetGithubRepositories(ctx echo.Context, params GetGithubRepositoriesParams) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -229,6 +244,37 @@ func (w *ServerInterfaceWrapper) DeleteEnvironmentId(ctx echo.Context) error {
 	return err
 }
 
+// GetGithubRepositories converts echo context to params.
+func (w *ServerInterfaceWrapper) GetGithubRepositories(ctx echo.Context) error {
+	var err error
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetGithubRepositoriesParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "authentication" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("authentication")]; found {
+		var Authentication string
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for authentication, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "authentication", valueList[0], &Authentication, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter authentication: %s", err))
+		}
+
+		params.Authentication = Authentication
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter authentication is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetGithubRepositories(ctx, params)
+	return err
+}
+
 // This is a simple interface which specifies echo.Route addition functions which
 // are present on both echo.Echo and echo.Group, since we want to allow using
 // either of them for path registration
@@ -261,5 +307,6 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.GET(baseURL+"/environment-instance/:id/list", wrapper.GetEnvironmentInstanceIdList)
 	router.GET(baseURL+"/environment/list", wrapper.GetEnvironmentList)
 	router.DELETE(baseURL+"/environment/:id", wrapper.DeleteEnvironmentId)
+	router.GET(baseURL+"/github/repositories", wrapper.GetGithubRepositories)
 
 }

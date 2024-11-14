@@ -38,9 +38,10 @@ import (
 
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
 	"github.com/coflnet/pr-env/internal/controller"
+	"github.com/coflnet/pr-env/internal/git"
+	"github.com/coflnet/pr-env/internal/keycloak"
 	"github.com/coflnet/pr-env/internal/kubeclient"
 	"github.com/coflnet/pr-env/internal/server"
-	"github.com/coflnet/pr-env/pkg/git"
 	// +kubebuilder:scaffold:imports
 )
 
@@ -81,8 +82,12 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	// setup keycloak
+	keycloakLogger := ctrl.Log.WithName("keycloak")
+	keycloakClient := keycloak.NewKeycloakClient(keycloakLogger)
+
 	// setup the github client
-	gc, err := git.NewGithubClient(ctrl.Log.WithName("githubclient"))
+	gc, err := git.NewGithubClient(ctrl.Log.WithName("githubclient"), keycloakClient)
 	if err != nil {
 		setupLog.Error(err, "unable to create github client")
 		os.Exit(1)
@@ -182,8 +187,9 @@ func main() {
 
 	kubeLogger := ctrl.Log.WithName("kubeclient")
 	kubeClient := kubeclient.NewKubeClient(kubeLogger)
+
 	serverLogger := ctrl.Log.WithName("server")
-	server := server.NewServer(&serverLogger, gc, kubeClient)
+	server := server.NewServer(&serverLogger, gc, kubeClient, keycloakClient)
 
 	go func() {
 		// TODO: read the port and listen address from the environment

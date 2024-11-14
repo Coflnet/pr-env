@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
-	"github.com/coflnet/pr-env/pkg/git"
+	"github.com/coflnet/pr-env/internal/git"
 	"github.com/go-logr/logr"
 )
 

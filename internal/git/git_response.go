@@ -51,7 +51,7 @@ If not even better!
 
 func (c *GithubClient) postMessageToPr(ctx context.Context, owner, repo string, prNr int, message string) error {
 	c.log.Info("Posting message to PR", "owner", owner, "repo", repo, "prNr", prNr, "message", message)
-	_, _, err := c.client.Issues.CreateComment(ctx, owner, repo, prNr, &github.IssueComment{
+	_, _, err := c.oauthClient.Issues.CreateComment(ctx, owner, repo, prNr, &github.IssueComment{
 		Body: &message,
 	})
 	return err
@@ -59,7 +59,7 @@ func (c *GithubClient) postMessageToPr(ctx context.Context, owner, repo string, 
 
 func (c *GithubClient) pullRequestAlreadyHasMessage(ctx context.Context, owner, repo string, prNr int, message string) bool {
 	c.log.Info("Checking if PR already has message", "owner", owner, "repo", repo, "prNr", prNr, "message", message)
-	comments, _, err := c.client.Issues.ListComments(ctx, owner, repo, prNr, &github.IssueListCommentsOptions{})
+	comments, _, err := c.oauthClient.Issues.ListComments(ctx, owner, repo, prNr, &github.IssueListCommentsOptions{})
 	if err != nil {
 		c.log.Error(err, "unable to list comments")
 		return false
@@ -73,7 +73,7 @@ func (c *GithubClient) pullRequestAlreadyHasMessage(ctx context.Context, owner, 
 			// but for the development version this is enough
 			age := time.Now().Sub(comment.CreatedAt.Time)
 			if age > time.Hour*24 {
-				_, err = c.client.Issues.DeleteComment(ctx, owner, repo, *comment.ID)
+				_, err = c.oauthClient.Issues.DeleteComment(ctx, owner, repo, *comment.ID)
 				if err != nil {
 					c.log.Error(err, "unable to delete comment, but it is outdated")
 					return false

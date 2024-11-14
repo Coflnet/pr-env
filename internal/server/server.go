@@ -5,25 +5,28 @@ import (
 	"os"
 	"strconv"
 
+	"github.com/coflnet/pr-env/internal/git"
+	"github.com/coflnet/pr-env/internal/keycloak"
 	"github.com/coflnet/pr-env/internal/kubeclient"
 	apigen "github.com/coflnet/pr-env/internal/server/openapi"
-	"github.com/coflnet/pr-env/pkg/git"
 	"github.com/go-logr/logr"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 )
 
 type Server struct {
-	log          *logr.Logger
-	kubeClient   *kubeclient.KubeClient
-	githubClient *git.GithubClient
+	log            *logr.Logger
+	kubeClient     *kubeclient.KubeClient
+	githubClient   *git.GithubClient
+	keycloakClient *keycloak.KeycloakClient
 }
 
-func NewServer(logger *logr.Logger, githubClient *git.GithubClient, kubeClient *kubeclient.KubeClient) *echo.Echo {
+func NewServer(logger *logr.Logger, githubClient *git.GithubClient, kubeClient *kubeclient.KubeClient, keycloak *keycloak.KeycloakClient) *echo.Echo {
 	s := &Server{
-		githubClient: githubClient,
-		kubeClient:   kubeClient,
-		log:          logger,
+		githubClient:   githubClient,
+		kubeClient:     kubeClient,
+		keycloakClient: keycloak,
+		log:            logger,
 	}
 
 	e := echo.New()
@@ -58,6 +61,8 @@ func NewServer(logger *logr.Logger, githubClient *git.GithubClient, kubeClient *
 
 	// openapi spec
 	e.Static("/api/openapi", "internal/server/openapi")
+
+	e.GET("/api/github/setupUrl", s.ConfigureInstallation)
 
 	// everything else
 	apigen.RegisterHandlersWithBaseURL(e, *s, "/api/v1")

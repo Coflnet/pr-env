@@ -81,8 +81,10 @@ func (c *oidcConfig) readInConfig() error {
 
 func (m *authenticationMiddleware) Process(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
-
 		if strings.HasPrefix(c.Path(), "/api/openapi") {
+			return next(c)
+		}
+		if strings.Contains(c.Path(), "setupUrl") {
 			return next(c)
 		}
 

@@ -147,8 +147,68 @@ paths:
         required: true
         schema:
           type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.environmentModel'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.httpError'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.httpError'
+  /github/repositories:
+    get:
+      tags:
+      - github
+      summary: Lists all the repositories of the authenticated user
+      description: Lists all the repositories of the authenticated user
+      parameters:
+      - name: authentication
+        in: header
+        description: Authentication token
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/server.githubRepositoryModel'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.httpError'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.httpError'
 components:
   schemas:
+    server.githubRepositoryModel:
+      type: object
+      properties:
+        name:
+          type: string
+        owner:
+          type: string
     server.applicationSettingsModel:
       type: object
       properties:
