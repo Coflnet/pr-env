@@ -29,7 +29,7 @@ func (k *KeycloakClient) client() *gocloak.GoCloak {
 func (k *KeycloakClient) adminToken(client *gocloak.GoCloak) *gocloak.JWT {
 	user := os.Getenv("KEYCLOAK_USERNAME")
 	pass := os.Getenv("KEYCLOAK_PASSWORD")
-	realm := "master"
+	realm := os.Getenv("KEYCLOAK_REALM")
 
 	token, err := client.LoginAdmin(context.TODO(), user, pass, realm)
 	if err != nil {
