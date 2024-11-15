@@ -10,15 +10,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// TODO: figure out how to handle namespaces
-const namespace = "default"
-
 func (k *KubeClient) ListPreviewEnvironments(ctx context.Context, owner string) (*coflnetv1alpha1.PreviewEnvironmentList, error) {
 	k.log.Info("Listing PreviewEnvironments from the cluster")
 
 	var peiList coflnetv1alpha1.PreviewEnvironmentList
 	err := k.kClient.List(ctx, &peiList, &client.ListOptions{
-		Namespace:     namespace,
+		Namespace:     namespace(),
 		LabelSelector: labels.Set(map[string]string{"owner": owner}).AsSelector(),
 	})
 
@@ -34,7 +31,7 @@ func (k *KubeClient) PreviewEnvironmentOfUser(ctx context.Context, owner string)
 	var peList coflnetv1alpha1.PreviewEnvironmentList
 
 	err := k.kClient.List(ctx, &peList, &client.ListOptions{
-		Namespace:     namespace,
+		Namespace:     namespace(),
 		LabelSelector: labels.Set(map[string]string{"owner": owner}).AsSelector(),
 	})
 
@@ -98,7 +95,7 @@ func (k *KubeClient) PreviewEnvironmentByDisplayName(ctx context.Context, owner,
 
 func (k *KubeClient) CreatePreviewEnvironment(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment) error {
 	k.log.Info("Creating PreviewEnvironment in the cluster")
-	pe.SetNamespace(namespace)
+	pe.SetNamespace(namespace())
 
 	err := k.kClient.Create(ctx, pe)
 	if err != nil {

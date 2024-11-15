@@ -3,6 +3,7 @@ package kubeclient
 import (
 	"context"
 	"log"
+	"os"
 
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 
@@ -69,4 +70,12 @@ func (k *KubeClient) TriggerUpdateForPreviewEnvironmentInstance(ctx context.Cont
 	}
 
 	return nil
+}
+
+func namespace() string {
+	v := os.Getenv("NAMESPACE")
+	if v == "" {
+		panic("NAMESPACE environment variable not set")
+	}
+	return v
 }

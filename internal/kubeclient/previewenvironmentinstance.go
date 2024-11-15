@@ -14,7 +14,7 @@ func (k *KubeClient) ListPreviewEnvironmentInstancesByPreviewEnvironmentId(ctx c
 
 	var peiList coflnetv1alpha1.PreviewEnvironmentInstanceList
 	err := k.kClient.List(ctx, &peiList, &client.ListOptions{
-		Namespace: namespace,
+		Namespace: namespace(),
 		LabelSelector: labels.Set(map[string]string{
 			"owner":              owner,
 			"previewenvironment": string(id),
