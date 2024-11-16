@@ -41,29 +41,40 @@ spec:
             description: PreviewEnvironmentInstanceSpec defines the desired state
               of PreviewEnvironmentInstance.
             properties:
-              branch:
-                description: Branch of the repository to be used for the specific
-                  preview environment instance
+              desiredPhase:
+                description: DesiredPhase the desired phase of the preview environment
+                  instance
                 type: string
-              commitHash:
-                description: CommitHash the last commit hash, this should be the version
-                  that the instance is running
-                type: string
-              gitOrganization:
-                description: GitOrganization the organization of the git repostiory
-                type: string
-              gitRepository:
-                description: GitRepository the name of the git repository
-                type: string
-              pullRequestNumber:
-                description: PullRequestIdentifier the number of the pull request
-                type: integer
+              instanceGitSettings:
+                description: InstanceGitSettings configuration of the git repository
+                  that should be used for the preview environment instance
+                properties:
+                  branch:
+                    description: Branch the branch that should be used for the preview
+                      environment instance
+                    type: string
+                  commitHash:
+                    description: CommitHash the last commit hash, this should be the
+                      version that the instance is running
+                    type: string
+                  pullRequestNumber:
+                    description: PullRequestNumber the pull request number for the
+                      preview environment instance
+                    type: integer
+                required:
+                - branch
+                type: object
+            required:
+            - desiredPhase
+            - instanceGitSettings
             type: object
           status:
             description: PreviewEnvironmentInstanceStatus defines the observed state
               of PreviewEnvironmentInstance.
             properties:
               builtVersions:
+                description: BuiltVersions a list of already built versions, these
+                  include the commit hash and the timestamp
                 items:
                   properties:
                     tag:
@@ -73,14 +84,18 @@ spec:
                       description: Timestamp of the upload
                       format: date-time
                       type: string
+                  required:
+                  - tag
+                  - timestamp
                   type: object
                 type: array
+              phase:
+                description: Phase is the current phase of the preview environment
+                  instance
+                type: string
               publicFacingUrl:
                 description: PublicFacingUrl the url where the preview environment
                   can be accessed
-                type: string
-              rebuildStatus:
-                description: RebuildStatus the status of the rebuild
                 type: string
             type: object
         type: object

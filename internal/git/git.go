@@ -2,6 +2,7 @@ package git
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -99,8 +100,12 @@ func (c *GithubClient) PullRequestsOfRepositoryAndBranch(ctx context.Context, ow
 	return filteredPrs, nil
 }
 
-func (c *GithubClient) PullRequestOfPei(ctx context.Context, pei *coflnetv1alpha.PreviewEnvironmentInstance) (*github.PullRequest, error) {
-	return c.PullRequest(ctx, pei.Spec.GitOrganization, pei.Spec.GitRepository, pei.Spec.PullRequestNumber)
+func (c *GithubClient) PullRequestOfPei(ctx context.Context, pe *coflnetv1alpha.PreviewEnvironment, pei *coflnetv1alpha.PreviewEnvironmentInstance) (*github.PullRequest, error) {
+	if pei.Spec.InstanceGitSettings.PullRequestNumber == nil {
+		return nil, fmt.Errorf("not implemented")
+	}
+
+	return c.PullRequest(ctx, pe.Spec.GitSettings.Organization, pe.Spec.GitSettings.Repository, *pei.Spec.InstanceGitSettings.PullRequestNumber)
 }
 
 func (c *GithubClient) PullRequest(ctx context.Context, owner, repo string, number int) (*github.PullRequest, error) {

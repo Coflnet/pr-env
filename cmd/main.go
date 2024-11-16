@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"flag"
 	"os"
@@ -189,7 +190,7 @@ func main() {
 	kubeClient := kubeclient.NewKubeClient(kubeLogger)
 
 	serverLogger := ctrl.Log.WithName("server")
-	server := server.NewServer(&serverLogger, gc, kubeClient, keycloakClient)
+	server := server.NewServer(context.TODO(), &serverLogger, gc, kubeClient, keycloakClient)
 
 	go func() {
 		// TODO: read the port and listen address from the environment

@@ -18,10 +18,11 @@ package controller
 
 import (
 	"context"
-	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/go-github/v66/github"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -49,27 +50,28 @@ type PreviewEnvironmentReconciler struct {
 // +kubebuilder:rbac:groups=coflnet.coflnet.com,resources=previewenvironments/finalizers,verbs=update
 func (r *PreviewEnvironmentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	r.log.Info("Reconciling PreviewEnvironment", "namespace", req.Namespace, "name", req.Name)
+	// TODO: mark environment as updating
 
 	// load the preview environment
-	var pr coflnetv1alpha1.PreviewEnvironment
-	if err := r.Get(ctx, req.NamespacedName, &pr); err != nil {
+	var pe coflnetv1alpha1.PreviewEnvironment
+	if err := r.Get(ctx, req.NamespacedName, &pe); err != nil {
 		r.log.Info("Unable to load PreviewEnvironment", "namespace", req.Namespace, "name", req.Name)
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
 	// check if the preview environment is being deleted
-	if !pr.ObjectMeta.DeletionTimestamp.IsZero() {
-		if controllerutil.ContainsFinalizer(&pr, finalizerName) {
+	if !pe.ObjectMeta.DeletionTimestamp.IsZero() {
+		if controllerutil.ContainsFinalizer(&pe, finalizerName) {
 			// do some deletion work
-			err := r.deletePreviewEnvironmentInstancesForPreviewEnvironment(ctx, pr)
+			err := r.deletePreviewEnvironmentInstancesForPreviewEnvironment(ctx, pe)
 			if err != nil {
 				r.log.Error(err, "Unable to delete PreviewEnvironmentInstances", "namespace", req.Namespace, "name", req.Name)
 				return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 			}
 
 			// remove the finalizer
-			controllerutil.RemoveFinalizer(&pr, finalizerName)
-			if err := r.Update(ctx, &pr); err != nil {
+			controllerutil.RemoveFinalizer(&pe, finalizerName)
+			if err := r.Update(ctx, &pe); err != nil {
 				r.log.Error(err, "Unable to remove finalizer from PreviewEnvironment", "namespace", req.Namespace, "name", req.Name)
 				return ctrl.Result{}, err
 			}
@@ -79,32 +81,24 @@ func (r *PreviewEnvironmentReconciler) Reconcile(ctx context.Context, req ctrl.R
 	}
 
 	// add the finalizer if it does not exist
-	if !controllerutil.ContainsFinalizer(&pr, finalizerName) {
-		controllerutil.AddFinalizer(&pr, finalizerName)
-		if err := r.Update(ctx, &pr); err != nil {
+	if !controllerutil.ContainsFinalizer(&pe, finalizerName) {
+		controllerutil.AddFinalizer(&pe, finalizerName)
+		if err := r.Update(ctx, &pe); err != nil {
 			r.log.Error(err, "Unable to add finalizer to PreviewEnvironment", "namespace", req.Namespace, "name", req.Name)
 			return ctrl.Result{}, err
 		}
 	}
 
-	// list all the available branches of the specific preview environment
-	prs, err := r.githubClient.PullRequestsOfRepository(ctx, pr.Spec.GitOrganization, pr.Spec.GitRepository)
+	// list all the instances that should be created
+	peis, err := r.detectInstancesThatShouldBeCreated(ctx, pe)
 	if err != nil {
-		r.log.Error(err, "Unable to list branches of repository", "namespace", req.Namespace, "name", req.Name, "owner", pr.Spec.GitOrganization, "repo", pr.Spec.GitRepository)
-		return ctrl.Result{RequeueAfter: time.Minute * 1}, nil
+		// TODO: mark the pe as failed
+		r.log.Error(err, "Unable to detect instances that should be created", "namespace", req.Namespace, "name", req.Name)
+		return ctrl.Result{RequeueAfter: 15 * time.Second}, nil
 	}
-
-	prIdentifiers := make([]int, len(prs))
-	for i, pr := range prs {
-		prIdentifiers[i] = int(*pr.ID)
-	}
-
-	// update the status of the preview environment
-	pr.Status.PullRequestsDetected = prIdentifiers
-	r.log.Info("detected pullrequests for pe", "branches", pr.Status.PullRequestsDetected, "namespace", req.Namespace, "name", req.Name)
 
 	// create the preview environment instances that should be created for each branch
-	err = r.createPreviewEnvironmentInstancesForDetectedPullRequests(ctx, pr, prs)
+	err = r.savePreviewEnvironmentInstances(ctx, &pe, peis)
 	if err != nil {
 		r.log.Error(err, "Unable to create PreviewEnvironment instances", "namespace", req.Namespace, "name", req.Name)
 		return ctrl.Result{
@@ -112,67 +106,162 @@ func (r *PreviewEnvironmentReconciler) Reconcile(ctx context.Context, req ctrl.R
 		}, nil
 	}
 
-	if err := r.Status().Update(ctx, &pr); err != nil {
-		r.log.Error(err, "Unable to update status of PreviewEnvironment", "namespace", req.Namespace, "name", req.Name)
-		return ctrl.Result{}, err
-	}
+	// TODO: update status
 
 	return ctrl.Result{}, nil
 }
 
-func (r *PreviewEnvironmentReconciler) createPreviewEnvironmentInstancesForDetectedPullRequests(ctx context.Context, pr coflnetv1alpha1.PreviewEnvironment, prs []*github.PullRequest) error {
-	for _, githubPr := range prs {
-		peiName := coflnetv1alpha1.PreviewEnvironmentInstanceNameFromPullRequest(pr.Name, pr.Spec.GitOrganization, pr.Spec.GitRepository, int(*githubPr.Number))
-		r.log.Info("check if a preview environment instance already exists", "pei", peiName, "namespace", pr.Namespace, "name", peiName, "owner", pr.GetLabels()["owner"])
+func (r *PreviewEnvironmentReconciler) detectInstancesThatShouldBeCreated(ctx context.Context, pe coflnetv1alpha1.PreviewEnvironment) ([]*coflnetv1alpha1.PreviewEnvironmentInstance, error) {
+	result := []*coflnetv1alpha1.PreviewEnvironmentInstance{}
 
-		pei := coflnetv1alpha1.PreviewEnvironmentInstance{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      peiName,
-				Namespace: pr.Namespace,
-			},
-		}
+	prs, err := r.detectOpenPullRequests(ctx, pe)
+	if err != nil {
+		return nil, err
+	}
 
-		// check if the preview environment instance already exists
-		err := r.Get(ctx, client.ObjectKey{Namespace: pei.Namespace, Name: pei.Name}, &pei)
-		if err != nil {
-			if client.IgnoreNotFound(err) != nil {
-				return err
-			}
-		}
-		if pei.Spec.PullRequestNumber == *githubPr.Number {
-			r.log.Info("pei exists with the same branch, skip creating it", "pei", pei.Name, "namespace", pei.Namespace)
-			continue
-		}
-		fmt.Printf("%v\n", pei)
+	r.log.Info("detected open pull requests", "count", len(prs), "namespace", pe.Namespace, "name", pe.Name)
+	for _, pullRequest := range prs {
+		result = append(result,
+			r.buildPreviewEnvironmentInstanceForPr(pe, pullRequest))
+	}
 
-		pei = coflnetv1alpha1.PreviewEnvironmentInstance{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      peiName,
-				Namespace: pr.Namespace,
-				Labels: map[string]string{
-					"owner":              pr.GetLabels()["owner"],
-					"previewenvironment": string(pr.GetUID()),
-				},
-			},
-			Spec: coflnetv1alpha1.PreviewEnvironmentInstanceSpec{
-				PullRequestNumber: *githubPr.Number,
-				Branch:            githubPr.Head.Ref,
-				GitOrganization:   pr.Spec.GitOrganization,
-				GitRepository:     pr.Spec.GitRepository,
-			},
-			Status: coflnetv1alpha1.PreviewEnvironmentInstanceStatus{
-				RebuildStatus: coflnetv1alpha1.RebuildStatusBuildingOutdated,
-			},
-		}
+	branches, err := r.detectOpenBranches(ctx, pe)
+	if err != nil {
+		return nil, err
+	}
 
-		// create the preview environment instance
-		r.log.Info("pei does not exist yet, creating it", "pei", pei.Name, "namespace", pei.Namespace)
-		if err := r.Create(ctx, &pei); err != nil {
+	r.log.Info("detected open branches", "count", len(branches), "namespace", pe.Namespace, "name", pe.Name)
+	for _, branch := range branches {
+		result = append(result, r.buildPreviewEnvironmentInstanceForBranch(pe, branch))
+	}
+
+	return result, nil
+}
+
+func (r *PreviewEnvironmentReconciler) detectOpenPullRequests(ctx context.Context, pr coflnetv1alpha1.PreviewEnvironment) ([]*github.PullRequest, error) {
+	prs, err := r.githubClient.PullRequestsOfRepository(ctx, pr.Spec.GitSettings.Organization, pr.Spec.GitSettings.Repository)
+	return prs, err
+}
+
+// detectOpenBranches detects the open branches of the repository
+// returns the name of the branches as a string slice
+func (r *PreviewEnvironmentReconciler) detectOpenBranches(ctx context.Context, pr coflnetv1alpha1.PreviewEnvironment) ([]string, error) {
+	if pr.Spec.BuildSettings.BuildAllBranches == false {
+		return []string{}, nil
+	}
+
+	branches, err := r.githubClient.BranchesOfRepository(ctx, pr.Spec.GitSettings.Organization, pr.Spec.GitSettings.Repository)
+
+	if pr.Spec.BuildSettings.BuildAllBranches || pr.Spec.BuildSettings.BranchWildcard == nil {
+		return branches, err
+	}
+
+	var filteredBranches []string
+	for _, branch := range branches {
+		if strings.Contains(branch, *pr.Spec.BuildSettings.BranchWildcard) {
+			filteredBranches = append(filteredBranches, branch)
+		}
+	}
+	return filteredBranches, nil
+}
+
+func (r *PreviewEnvironmentReconciler) buildPreviewEnvironmentInstanceForPr(pe coflnetv1alpha1.PreviewEnvironment, pullRequest *github.PullRequest) *coflnetv1alpha1.PreviewEnvironmentInstance {
+
+	name := coflnetv1alpha1.PreviewEnvironmentInstanceNameFromPullRequest(
+		pe.GetName(),
+		pe.GetOwner(),
+		pe.Spec.GitSettings.Organization,
+		pe.Spec.GitSettings.Repository,
+		int(pullRequest.GetID()),
+	)
+
+	gitSettings := coflnetv1alpha1.InstanceGitSettings{
+		PullRequestNumber: intPtr(int(pullRequest.GetNumber())),
+		Branch:            strPtr(pullRequest.GetHead().GetRef()),
+		CommitHash:        "",
+	}
+
+	return createInstanceFromEnvironment(pe, name, gitSettings)
+}
+
+func (r *PreviewEnvironmentReconciler) buildPreviewEnvironmentInstanceForBranch(pe coflnetv1alpha1.PreviewEnvironment, branch string) *coflnetv1alpha1.PreviewEnvironmentInstance {
+	name := coflnetv1alpha1.PreviewEnvironmentInstanceNameFromBranch(
+		pe.Name,
+		pe.GetLabels()["owner"],
+		pe.Spec.GitSettings.Organization,
+		pe.Spec.GitSettings.Repository,
+		branch,
+	)
+
+	gitSettings := coflnetv1alpha1.InstanceGitSettings{
+		Branch: strPtr(branch),
+	}
+
+	return createInstanceFromEnvironment(pe, name, gitSettings)
+}
+
+func createInstanceFromEnvironment(pe coflnetv1alpha1.PreviewEnvironment, name string, gitSettings coflnetv1alpha1.InstanceGitSettings) *coflnetv1alpha1.PreviewEnvironmentInstance {
+	return &coflnetv1alpha1.PreviewEnvironmentInstance{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: pe.Namespace,
+			Labels: map[string]string{
+				"owner":               pe.GetOwner(),
+				"previewenvironment":  string(pe.GetUID()),
+				"github-organization": pe.Spec.GitSettings.Organization,
+				"github-repository":   pe.Spec.GitSettings.Repository,
+				"github-identifier":   gitSettings.BranchOrPullRequestIdentifier(),
+			},
+		},
+		Spec: coflnetv1alpha1.PreviewEnvironmentInstanceSpec{
+			InstanceGitSettings: gitSettings,
+			DesiredPhase:        coflnetv1alpha1.InstancePhaseRunning,
+		},
+		Status: coflnetv1alpha1.PreviewEnvironmentInstanceStatus{
+			Phase: coflnetv1alpha1.InstancePhasePending,
+		},
+	}
+}
+
+func (r *PreviewEnvironmentReconciler) savePreviewEnvironmentInstances(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, peis []*coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	for _, pei := range peis {
+		if err := r.savePreviewEnvironmentInstance(ctx, pe, pei); err != nil {
 			return err
 		}
-		r.log.Info("created preview environment instance", "pei", pei.Name, "namespace", pei.Namespace)
 	}
 	return nil
+}
+
+func (r *PreviewEnvironmentReconciler) savePreviewEnvironmentInstance(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	r.log.Info("saving preview environment instance", "namespace", pei.Namespace, "name", pei.Name)
+
+	existingPei := &coflnetv1alpha1.PreviewEnvironmentInstance{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: pei.Namespace,
+			Name:      pei.Name,
+		},
+	}
+
+	err := r.Get(ctx, client.ObjectKey{Namespace: pei.Namespace, Name: pei.Name}, existingPei)
+	if err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+	}
+
+	// update the preview environment instance
+	if existingPei.Spec.DesiredPhase != "" {
+		pei.ObjectMeta = existingPei.ObjectMeta
+		err = r.Update(ctx, pei)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}
+
+	// create the preview environment instance
+	return r.Create(ctx, pei)
 }
 
 func (r *PreviewEnvironmentReconciler) deletePreviewEnvironmentInstancesForPreviewEnvironment(ctx context.Context, pr coflnetv1alpha1.PreviewEnvironment) error {
@@ -218,4 +307,8 @@ func (r *PreviewEnvironmentReconciler) SetupWithManager(mgr ctrl.Manager, gc *gi
 		For(&coflnetv1alpha1.PreviewEnvironment{}).
 		Named("previewenvironment").
 		Complete(r)
+}
+
+func intPtr(i int) *int {
+	return &i
 }

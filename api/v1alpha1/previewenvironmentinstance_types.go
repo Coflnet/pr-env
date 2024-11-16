@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -25,21 +26,23 @@ import (
 
 // PreviewEnvironmentInstanceSpec defines the desired state of PreviewEnvironmentInstance.
 type PreviewEnvironmentInstanceSpec struct {
-	// +optional
-	// Branch of the repository to be used for the specific preview environment instance
+	// +kubebuilder:validation:Required
+	// InstanceGitSettings configuration of the git repository that should be used for the preview environment instance
+	InstanceGitSettings InstanceGitSettings `json:"instanceGitSettings"`
+
+	// +kubebuilder:validation:Required
+	// DesiredPhase the desired phase of the preview environment instance
+	DesiredPhase string `json:"desiredPhase"`
+}
+
+type InstanceGitSettings struct {
+	// +kubebuilder:validation:Required
+	// Branch the branch that should be used for the preview environment instance
 	Branch *string `json:"branch"`
 
 	// +optional
-	// PullRequestIdentifier the number of the pull request
-	PullRequestNumber int `json:"pullRequestNumber"`
-
-	// +optional
-	// GitOrganization the organization of the git repostiory
-	GitOrganization string `json:"gitOrganization"`
-
-	// +optional
-	// GitRepository the name of the git repository
-	GitRepository string `json:"gitRepository"`
+	// PullRequestNumber the pull request number for the preview environment instance
+	PullRequestNumber *int `json:"pullRequestNumber"`
 
 	// +optional
 	// CommitHash the last commit hash, this should be the version that the instance is running
@@ -48,11 +51,13 @@ type PreviewEnvironmentInstanceSpec struct {
 
 // PreviewEnvironmentInstanceStatus defines the observed state of PreviewEnvironmentInstance.
 type PreviewEnvironmentInstanceStatus struct {
-	// +optional
-	// RebuildStatus the status of the rebuild
-	RebuildStatus string `json:"rebuildStatus"`
 
 	// +optional
+	// Phase is the current phase of the preview environment instance
+	Phase string `json:"phase"`
+
+	// +optional
+	// BuiltVersions a list of already built versions, these include the commit hash and the timestamp
 	BuiltVersions []BuiltVersion `json:"builtVersions"`
 
 	// +optional
@@ -61,23 +66,22 @@ type PreviewEnvironmentInstanceStatus struct {
 }
 
 type BuiltVersion struct {
-
-	// +optional
+	// +kubebuilder:validation:Required
 	// Tag of the built version
 	Tag string `json:"tag"`
 
-	// +optional
+	// +kubebuilder:validation:Required
 	// Timestamp of the upload
 	Timestamp metav1.Time `json:"timestamp"`
 }
 
 const (
-	RebuildStatusBuildingOutdated   = "buildingOutdated"
-	RebuildStatusDeploymentOutdated = "deploymentOutdated"
-	RebuildStatusBuilding           = "building"
-	RebuildStatusDeploying          = "deploying"
-	RebuildStatusFailed             = "failed"
-	RebuildStatusSuccess            = "success"
+	InstancePhasePending   = "pending"
+	InstancePhaseBuilding  = "building"
+	InstancePhaseDeploying = "deploying"
+	InstancePhaseRunning   = "running"
+	InstancePhaseFailed    = "failed"
+	InstancePhaseStopped   = "stopped"
 )
 
 // +kubebuilder:object:root=true
@@ -105,8 +109,45 @@ func init() {
 	SchemeBuilder.Register(&PreviewEnvironmentInstance{}, &PreviewEnvironmentInstanceList{})
 }
 
-func PreviewEnvironmentInstanceNameFromPullRequest(pe string, owner, repo string, number int) string {
-	name := fmt.Sprintf("%s-%s-%s-%d", pe, owner, repo, number)
-	name = strings.ReplaceAll(name, "/", "-")
-	return strings.ToLower(name)
+func PreviewEnvironmentInstanceNameFromPullRequest(pe string, owner, gitOrganization, gitRepository string, pullRequestIdentifier int) string {
+	return previewEnvironmentInstanceName(pe, owner, gitOrganization, gitRepository, fmt.Sprintf("pr-%d", pullRequestIdentifier))
+}
+
+func PreviewEnvironmentInstanceNameFromBranch(pe string, owner, gitOrganization, gitRepository, branch string) string {
+	return previewEnvironmentInstanceName(pe, owner, gitOrganization, gitRepository, branch)
+}
+
+func previewEnvironmentInstanceName(pe string, owner, gitOrganization, gitRepository, identifier string) string {
+	str := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s-%s", owner, pe, gitOrganization, gitRepository, identifier))
+	str = strings.ReplaceAll(str, "/", "-")
+	if len(str) > 50 {
+		return str[len(str)-50:]
+	}
+	return str
+}
+
+func PreviewEnvironmentInstanceContainerName(pe *PreviewEnvironment, identifier, commitHash string) string {
+	return fmt.Sprintf("%s/%s/tmpenv:%s-%s-%s-%s-%s", pe.Spec.ContainerRegistry.Registry, pe.Spec.ContainerRegistry.Repository, pe.GetOwner(), pe.Spec.GitSettings.Organization, pe.Spec.GitSettings.Repository, identifier, commitHash)
+}
+
+func (g *InstanceGitSettings) BranchOrPullRequestIdentifier() string {
+	if g.PullRequestNumber != nil {
+		return strconv.Itoa(*g.PullRequestNumber)
+	}
+	if g.Branch != nil {
+		return *g.Branch
+	}
+	panic("neither branch nor pull request number is set")
+}
+
+func (pei *PreviewEnvironmentInstance) BranchOrPullRequestIdentifier() string {
+	return pei.Spec.InstanceGitSettings.BranchOrPullRequestIdentifier()
+}
+
+func (pei *PreviewEnvironmentInstance) GetOwner() string {
+	return pei.GetLabels()["owner"]
+}
+
+func (pei *PreviewEnvironmentInstance) GetPreviewEnvironmentId() string {
+	return pei.GetLabels()["previewenvironment"]
 }

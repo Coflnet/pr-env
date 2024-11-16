@@ -23,11 +23,6 @@ func (r *PreviewEnvironmentInstanceReconciler) redeployInstance(ctx context.Cont
 }
 
 func (r *PreviewEnvironmentInstanceReconciler) deployEnvironmentInstance(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
-	pei.Status.RebuildStatus = coflnetv1alpha1.RebuildStatusDeploying
-	if err := r.Status().Update(ctx, pei); err != nil {
-		return err
-	}
-
 	err := r.deployKubernetesDeployment(ctx, pe, pei)
 	if err != nil {
 		return err
@@ -68,7 +63,7 @@ func (r *PreviewEnvironmentInstanceReconciler) deleteResourcesForPreviewEnvironm
 }
 
 func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesDeployment(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
-	var image = fmt.Sprintf("%s/%s/pr-env:%s-%s-%s", pe.Spec.ContainerRegistry.Registry, pe.Spec.ContainerRegistry.Repository, pei.Spec.GitOrganization, pei.Spec.GitRepository, pei.Spec.CommitHash)
+	image := coflnetv1alpha1.PreviewEnvironmentInstanceContainerName(pe, pei.BranchOrPullRequestIdentifier(), pei.Spec.InstanceGitSettings.CommitHash)
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -99,6 +94,7 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesDeployment(ctx co
 									Name:          "http",
 								},
 							},
+							Env: envFromPe(pe),
 						},
 					},
 				},
@@ -108,6 +104,11 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesDeployment(ctx co
 			},
 		},
 	}
+
+	// TODO: reactivate
+	// if pe.Spec.ApplicationSettings.Command != nil {
+	// 	deployment.Spec.Template.Spec.Containers[0].Command = strings.Split(*pe.Spec.ApplicationSettings.Command, " ")
+	// }
 
 	r.log.Info("Check if deployment already exists", "namespace", pei.Namespace, "name", pei.Name)
 	var kDeployment appsv1.Deployment
@@ -189,7 +190,8 @@ func (r *PreviewEnvironmentInstanceReconciler) deleteKubernetesService(ctx conte
 }
 
 func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesIngress(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
-	path := fmt.Sprintf("/%s/%s/%d", pe.Spec.GitOrganization, pe.Spec.GitRepository, pei.Spec.PullRequestNumber)
+	path := fmt.Sprintf("/%s/%s/%s/%s", pe.Spec.GitSettings.Organization, pe.Spec.GitSettings.Repository, pei.BranchOrPullRequestIdentifier(), pei.Spec.InstanceGitSettings.CommitHash)
+
 	host := pe.Spec.ApplicationSettings.IngressHostname
 	publicEndpoint := fmt.Sprintf("https://%s%s", host, path)
 
@@ -210,7 +212,7 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesIngress(ctx conte
 							Paths: []networkingv1.HTTPIngressPath{
 								{
 									Path:     path,
-									PathType: strPtr(networkingv1.PathTypeImplementationSpecific),
+									PathType: pathPtr(networkingv1.PathTypeImplementationSpecific),
 									Backend: networkingv1.IngressBackend{
 										Service: &networkingv1.IngressServiceBackend{
 											Name: pei.Name,
@@ -264,11 +266,26 @@ func (r *PreviewEnvironmentInstanceReconciler) deleteKubernetesIngress(ctx conte
 	return nil
 }
 
-func strPtr(s networkingv1.PathType) *networkingv1.PathType {
+func envFromPe(pe *coflnetv1alpha1.PreviewEnvironment) []corev1.EnvVar {
+	res := []corev1.EnvVar{}
+	for _, v := range *pe.Spec.ApplicationSettings.EnvironmentVariables {
+		res = append(res, corev1.EnvVar{
+			Name:  v.Key,
+			Value: v.Value,
+		})
+	}
+	return res
+}
+
+func pathPtr(s networkingv1.PathType) *networkingv1.PathType {
 	return &s
 }
 
 func int32Ptr(i int) *int32 {
 	i32 := int32(i)
 	return &i32
+}
+
+func strPtr(s string) *string {
+	return &s
 }

@@ -10,51 +10,57 @@ import (
 	apigen "github.com/coflnet/pr-env/internal/server/openapi"
 	"github.com/google/go-github/v66/github"
 	"github.com/labstack/echo/v4"
+	"k8s.io/apimachinery/pkg/types"
 )
 
-func convertToGithubRepositoryModelList(repos []*github.Repository) []apigen.ServerGithubRepositoryModel {
-	res := make([]apigen.ServerGithubRepositoryModel, len(repos))
-	for i, repo := range repos {
-		res[i] = convertToGithubRepositoryModel(repo)
-	}
-	return res
-}
+func (s Server) convertToGithubRepositoryModelList(repos []*github.Repository) []apigen.GithubRepositoryModel {
 
-func convertToGithubRepositoryModel(repo *github.Repository) apigen.ServerGithubRepositoryModel {
-	return apigen.ServerGithubRepositoryModel{
-		Name:  strPtr(repo.GetName()),
-		Owner: strPtr(repo.GetOwner().GetLogin()),
+	result := []apigen.GithubRepositoryModel{}
+	for _, repo := range repos {
+		if repo.Owner == nil || repo.Owner.Login == nil {
+			s.log.Info("repo owner is null", repo.GetFullName())
+			continue
+		}
+
+		result = append(result, apigen.GithubRepositoryModel{
+			Name:  repo.GetName(),
+			Owner: repo.Owner.GetLogin(),
+		})
 	}
+
+	return result
 }
 
 func strPtr(s string) *string {
 	return &s
 }
 
-func (s Server) GetGithubRepositories(c echo.Context, params apigen.GetGithubRepositoriesParams) error {
-	owner := c.Get("user").(string)
-	s.log.Info("Listing Github repositories", "owner", owner)
+func (s Server) GetGithubRepositories(ctx context.Context, request apigen.GetGithubRepositoriesRequestObject) (apigen.GetGithubRepositoriesResponseObject, error) {
+	owner, err := s.userIdFromAuthenticationToken(ctx, request.Params.Authentication)
+	if err != nil {
+		return nil, echo.NewHTTPError(401, err.Error())
+	}
 
-	installationId, err := s.keycloakClient.GithubInstallationIdForUser(c.Request().Context(), owner)
+	installationId, err := s.keycloakClient.GithubInstallationIdForUser(ctx, owner)
 	if err != nil {
 		if e, ok := err.(keycloak.InstallationIdDoesNotExistError); ok {
 			s.log.Info("Installation id does not exist", "user", e.UserId)
-			return echo.NewHTTPError(401, "User has no github app connected")
+			return nil, echo.NewHTTPError(401, "User has no github app connected")
 		}
 
 		s.log.Error(err, "Unable to get Github installation id")
-		return echo.NewHTTPError(500, err.Error())
+		return nil, echo.NewHTTPError(500, err.Error())
 	}
 	s.log.Info("Found Github installation id", "id", installationId)
 
-	repos, err := s.githubClient.ListReposOfUser(c.Request().Context(), installationId)
+	repos, err := s.githubClient.ListReposOfUser(ctx, installationId)
 	if err != nil {
 		s.log.Error(err, "Unable to list repositories")
-		return echo.NewHTTPError(500, err.Error())
+		return nil, echo.NewHTTPError(500, err.Error())
 	}
 
 	s.log.Info("Found repositories", "count", len(repos.Repositories))
-	return c.JSON(200, convertToGithubRepositoryModelList(repos.Repositories))
+	return apigen.GetGithubRepositories200JSONResponse(s.convertToGithubRepositoryModelList(repos.Repositories)), nil
 }
 
 func (s Server) ConfigureInstallation(c echo.Context) error {
@@ -146,6 +152,11 @@ func (s *Server) HandleGithubPullRequest(ctx context.Context, event *github.Pull
 }
 
 func (s *Server) HandleGithubEvent(ctx context.Context, owner, repo string, prNumber int) error {
+	pei, err := s.kubeClient.PreviewEnvironmentByOrganizationRepoAndIdentifier(ctx, owner, repo, strconv.Itoa(prNumber))
+	if err != nil {
+		return err
+	}
+
 	s.log.Info("Handling Github event", "owner", owner, "repo", repo)
-	return s.kubeClient.TriggerUpdateForPreviewEnvironmentInstance(ctx, owner, repo, prNumber)
+	return s.kubeClient.TriggerUpdateForPreviewEnvironmentInstance(ctx, pei.GetOwner(), types.UID(pei.GetPreviewEnvironmentId()), pei.BranchOrPullRequestIdentifier())
 }

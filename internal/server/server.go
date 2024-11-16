@@ -21,8 +21,8 @@ type Server struct {
 	keycloakClient *keycloak.KeycloakClient
 }
 
-func NewServer(logger *logr.Logger, githubClient *git.GithubClient, kubeClient *kubeclient.KubeClient, keycloak *keycloak.KeycloakClient) *echo.Echo {
-	s := &Server{
+func NewServer(ctx context.Context, logger *logr.Logger, githubClient *git.GithubClient, kubeClient *kubeclient.KubeClient, keycloak *keycloak.KeycloakClient) *echo.Echo {
+	s := Server{
 		githubClient:   githubClient,
 		kubeClient:     kubeClient,
 		keycloakClient: keycloak,
@@ -30,9 +30,10 @@ func NewServer(logger *logr.Logger, githubClient *git.GithubClient, kubeClient *
 	}
 
 	e := echo.New()
-	authMiddleware, err := newAuthenticationMiddleware(context.TODO())
+
+	err := setupAuthenticationMiddleware(ctx)
 	if err != nil {
-		panic(err)
+		panic("unable to setup authentication middleware")
 	}
 
 	e.Use(middleware.Recover())
@@ -51,13 +52,12 @@ func NewServer(logger *logr.Logger, githubClient *git.GithubClient, kubeClient *
 		},
 	}))
 	e.Use(middleware.CORSWithConfig(middleware.DefaultCORSConfig))
-	e.Use(authMiddleware.Process)
 
 	// authentication routes
 	// those are not listed in the openapi spec
 	e.Static("/", "internal/server/static")
-	e.GET("/login", authMiddleware.loginHandler)
-	e.GET("/auth/callback", authMiddleware.callbackHandler)
+	e.GET("/login", loginHandler)
+	e.GET("/auth/callback", callbackHandler)
 
 	// openapi spec
 	e.Static("/api/openapi", staticDir())
@@ -65,9 +65,16 @@ func NewServer(logger *logr.Logger, githubClient *git.GithubClient, kubeClient *
 	e.GET("/api/github/setupUrl", s.ConfigureInstallation)
 
 	// everything else
-	apigen.RegisterHandlersWithBaseURL(e, *s, "/api/v1")
-
+	strictServer := apigen.NewStrictHandler(s, []apigen.StrictMiddlewareFunc{})
+	apigen.RegisterHandlersWithBaseURL(e, strictServer, "/api/v1")
 	return e
+}
+
+func MyMiddleware[K ~func(ctx echo.Context, args interface{}) (interface{}, error)](f K, operationID string) K {
+	return func(ctx echo.Context, args interface{}) (interface{}, error) {
+		// code
+		return f(ctx, args)
+	}
 }
 
 func staticDir() string {

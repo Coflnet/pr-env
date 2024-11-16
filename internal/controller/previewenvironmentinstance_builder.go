@@ -26,7 +26,7 @@ func (r *PreviewEnvironmentInstanceReconciler) rebuildInstance(ctx context.Conte
 	builtAvailable := false
 	if pei.Status.BuiltVersions != nil {
 		for _, version := range pei.Status.BuiltVersions {
-			if version.Tag == pei.Spec.CommitHash {
+			if version.Tag == pei.Spec.InstanceGitSettings.CommitHash {
 				builtAvailable = true
 				break
 			}
@@ -35,6 +35,11 @@ func (r *PreviewEnvironmentInstanceReconciler) rebuildInstance(ctx context.Conte
 
 	if builtAvailable {
 		r.log.Info("Built version is already available, skip this build", "namespace", pei.Namespace, "name", pei.Name)
+		return nil
+	}
+
+	if pei.Spec.InstanceGitSettings.CommitHash == "" {
+		r.log.Info("No commit hash available, skip this build", "namespace", pei.Namespace, "name", pei.Name)
 		return nil
 	}
 
@@ -67,19 +72,8 @@ func (r *PreviewEnvironmentInstanceReconciler) buildContainerImage(ctx context.C
 		}
 	}
 
-	pei.Status.RebuildStatus = coflnetv1alpha1.RebuildStatusBuilding
-	if err := r.Status().Update(ctx, pei); err != nil {
-		return err
-	}
-
 	err := r.buildAndWaitForContainerImage(ctx, pe, pei)
-	pei.Status.BuiltVersions = updateBuiltVersions(pei.Status.BuiltVersions, pei.Spec.CommitHash, 10)
-
-	pei.Status.RebuildStatus = coflnetv1alpha1.RebuildStatusDeploymentOutdated
-	if err := r.Status().Update(ctx, pei); err != nil {
-		return err
-	}
-
+	pei.Status.BuiltVersions = updateBuiltVersions(pei.Status.BuiltVersions, pei.Spec.InstanceGitSettings.CommitHash, 10)
 	return err
 }
 
@@ -107,7 +101,7 @@ func updateBuiltVersions(versions []coflnetv1alpha1.BuiltVersion, commitHash str
 func (r *PreviewEnvironmentInstanceReconciler) buildAndWaitForContainerImage(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	const kanikoSecret = "dockerhub"
 	var jobName = fmt.Sprintf("%s%s", buildPrefix, pei.Name)
-	var destination = fmt.Sprintf("%s/%s/pr-env:%s-%s-%s", pe.Spec.ContainerRegistry.Registry, pe.Spec.ContainerRegistry.Repository, pei.Spec.GitOrganization, pei.Spec.GitRepository, pei.Spec.CommitHash)
+	var destination = coflnetv1alpha1.PreviewEnvironmentInstanceContainerName(pe, pei.BranchOrPullRequestIdentifier(), pei.Spec.InstanceGitSettings.CommitHash)
 
 	kanikoJob := &kbatch.Job{
 		ObjectMeta: metav1.ObjectMeta{
@@ -125,7 +119,7 @@ func (r *PreviewEnvironmentInstanceReconciler) buildAndWaitForContainerImage(ctx
 							Image: "gcr.io/kaniko-project/executor:v1.23.2",
 							Args: []string{
 								"--dockerfile=Dockerfile",
-								fmt.Sprintf("--context=git://github.com/%s/%s.git#refs/heads/%s", pei.Spec.GitOrganization, pei.Spec.GitRepository, *pei.Spec.Branch),
+								fmt.Sprintf("--context=git://github.com/%s/%s.git#refs/heads/%s", pe.Spec.GitSettings.Organization, pe.Spec.GitSettings.Repository, *pei.Spec.InstanceGitSettings.Branch),
 								fmt.Sprintf("--destination=%s", destination),
 								fmt.Sprintf("--custom-platform=%s", "linux/amd64"),
 							},

@@ -43,6 +43,30 @@ spec:
               applicationSettings:
                 description: ApplicationSettings configuration for the running application
                 properties:
+                  command:
+                    description: Command is optional and can be used to override the
+                      default command that is used to start the application
+                    type: string
+                  environmentVariables:
+                    description: EnvironmentVariables is a list of environment variables
+                      that should be set for the application
+                    items:
+                      properties:
+                        key:
+                          description: Key is the key of the environment variable
+                          maxLength: 63
+                          minLength: 0
+                          type: string
+                        value:
+                          description: Value is the value of the environment variable
+                          maxLength: 63
+                          minLength: 0
+                          type: string
+                      required:
+                      - key
+                      - value
+                      type: object
+                    type: array
                   ingressHostname:
                     description: IngressHostname the hostname the application should
                       get exposed on
@@ -53,6 +77,29 @@ spec:
                     type: integer
                 required:
                 - ingressHostname
+                type: object
+              buildSettings:
+                description: BuildSettings configuration for the build process
+                properties:
+                  branchWildcard:
+                    description: BranchWildcard is optional and can be used to specify
+                      a wildcard for branches that should be built
+                    type: string
+                  buildAllBranches:
+                    description: BuildAllBranches is a flag that can be used to build
+                      all branches
+                    type: boolean
+                  buildAllPullRequests:
+                    description: BuildAllPullRequests is a flag that can be used to
+                      build all pull requests
+                    type: boolean
+                  dockerfile:
+                    description: DockerfilePath is optional and can be used to override
+                      the default Dockerfile that is used to build the application
+                    type: string
+                required:
+                - buildAllBranches
+                - buildAllPullRequests
                 type: object
               containerRegistry:
                 description: ContainerRegistry configuration of the container registry
@@ -74,21 +121,34 @@ spec:
                 description: DisplayName is the name that can be displayed to the
                   user
                 type: string
-              gitOrganization:
-                maxLength: 63
-                minLength: 0
-                type: string
-              gitRepository:
-                maxLength: 63
-                minLength: 0
-                type: string
+              gitSettings:
+                description: GitSettings configuration of the git repository that
+                  should be used for the preview environments
+                properties:
+                  organization:
+                    maxLength: 63
+                    minLength: 0
+                    type: string
+                  repository:
+                    maxLength: 63
+                    minLength: 0
+                    type: string
+                required:
+                - organization
+                - repository
+                type: object
             required:
-            - gitOrganization
-            - gitRepository
+            - applicationSettings
+            - buildSettings
+            - containerRegistry
+            - displayName
+            - gitSettings
             type: object
           status:
             description: PreviewEnvironmentStatus defines the observed state of PreviewEnvironment.
             properties:
+              phase:
+                type: string
               pullRequests:
                 description: PullRequestsDetected is a list of pullRequests that were
                   detected

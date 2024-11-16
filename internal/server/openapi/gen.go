@@ -4,44 +4,79 @@
 package apigen
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo/v4"
 	"github.com/oapi-codegen/runtime"
+	strictecho "github.com/oapi-codegen/runtime/strictmiddleware/echo"
 )
 
-// ServerApplicationSettingsModel defines model for server.applicationSettingsModel.
-type ServerApplicationSettingsModel struct {
-	Hostname *string `json:"hostname,omitempty"`
-	Port     *int    `json:"port,omitempty"`
+// ApplicationSettingsModel defines model for applicationSettingsModel.
+type ApplicationSettingsModel struct {
+	Command              *string                     `json:"command,omitempty"`
+	EnvironmentVariables *[]EnvironmentVariableModel `json:"environmentVariables,omitempty"`
+	Port                 int                         `json:"port"`
 }
 
-// ServerContainerSettingsModel defines model for server.containerSettingsModel.
-type ServerContainerSettingsModel struct {
-	Image    *string `json:"image,omitempty"`
-	Registry *string `json:"registry,omitempty"`
+// BuildSettings defines model for buildSettings.
+type BuildSettings struct {
+	BranchWildcard       *string `json:"branchWildcard,omitempty"`
+	BuildAllBranches     bool    `json:"buildAllBranches"`
+	BuildAllPullRequests bool    `json:"buildAllPullRequests"`
+	DockerFilePath       *string `json:"dockerFilePath,omitempty"`
 }
 
-// ServerEnvironmentModel defines model for server.environmentModel.
-type ServerEnvironmentModel struct {
-	ApplicationSettings *ServerApplicationSettingsModel `json:"applicationSettings,omitempty"`
-	ContainerSettings   *ServerContainerSettingsModel   `json:"containerSettings,omitempty"`
-	GitSettings         *ServerGitSettingsModel         `json:"gitSettings,omitempty"`
-	Id                  *string                         `json:"id,omitempty"`
-	Name                *string                         `json:"name,omitempty"`
+// ContainerSettingsModel defines model for containerSettingsModel.
+type ContainerSettingsModel struct {
+	Registry   *string `json:"registry,omitempty"`
+	Repository *string `json:"repository,omitempty"`
 }
 
-// ServerGitSettingsModel defines model for server.gitSettingsModel.
-type ServerGitSettingsModel struct {
-	Organization *string `json:"organization,omitempty"`
-	Repository   *string `json:"repository,omitempty"`
+// EnvironmentVariableModel defines model for environmentVariableModel.
+type EnvironmentVariableModel struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
 }
 
-// ServerGithubRepositoryModel defines model for server.githubRepositoryModel.
-type ServerGithubRepositoryModel struct {
-	Name  *string `json:"name,omitempty"`
-	Owner *string `json:"owner,omitempty"`
+// GitSettingsModel defines model for gitSettingsModel.
+type GitSettingsModel struct {
+	Organization string `json:"organization"`
+	Repository   string `json:"repository"`
+}
+
+// GithubRepositoryModel defines model for githubRepositoryModel.
+type GithubRepositoryModel struct {
+	Name  string `json:"name"`
+	Owner string `json:"owner"`
+}
+
+// InstanceGitSettingsModel defines model for instanceGitSettingsModel.
+type InstanceGitSettingsModel struct {
+	Branch                *string `json:"branch,omitempty"`
+	CommitHash            *string `json:"commitHash,omitempty"`
+	PullRequestIdentifier *string `json:"pullRequestIdentifier,omitempty"`
+}
+
+// PreviewEnvironmentInstanceModel defines model for previewEnvironmentInstanceModel.
+type PreviewEnvironmentInstanceModel struct {
+	DesiredPhase         string                   `json:"desiredPhase"`
+	InstanceGitSettings  InstanceGitSettingsModel `json:"instanceGitSettings"`
+	Name                 string                   `json:"name"`
+	OwnerId              string                   `json:"ownerId"`
+	PreviewEnvironmentId string                   `json:"previewEnvironmentId"`
+}
+
+// PreviewEnvironmentModel defines model for previewEnvironmentModel.
+type PreviewEnvironmentModel struct {
+	ApplicationSettings ApplicationSettingsModel `json:"applicationSettings"`
+	BuildSettings       BuildSettings            `json:"buildSettings"`
+	ContainerSettings   ContainerSettingsModel   `json:"containerSettings"`
+	GitSettings         GitSettingsModel         `json:"gitSettings"`
+	Id                  string                   `json:"id"`
+	Name                string                   `json:"name"`
 }
 
 // ServerHttpError defines model for server.httpError.
@@ -80,7 +115,7 @@ type GetGithubRepositoriesParams struct {
 }
 
 // PostEnvironmentJSONRequestBody defines body for PostEnvironment for application/json ContentType.
-type PostEnvironmentJSONRequestBody = ServerEnvironmentModel
+type PostEnvironmentJSONRequestBody = PreviewEnvironmentModel
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -309,4 +344,355 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.DELETE(baseURL+"/environment/:id", wrapper.DeleteEnvironmentId)
 	router.GET(baseURL+"/github/repositories", wrapper.GetGithubRepositories)
 
+}
+
+type PostEnvironmentRequestObject struct {
+	Params PostEnvironmentParams
+	Body   *PostEnvironmentJSONRequestBody
+}
+
+type PostEnvironmentResponseObject interface {
+	VisitPostEnvironmentResponse(w http.ResponseWriter) error
+}
+
+type PostEnvironment200JSONResponse PreviewEnvironmentModel
+
+func (response PostEnvironment200JSONResponse) VisitPostEnvironmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEnvironment400JSONResponse ServerHttpError
+
+func (response PostEnvironment400JSONResponse) VisitPostEnvironmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEnvironment409JSONResponse ServerHttpError
+
+func (response PostEnvironment409JSONResponse) VisitPostEnvironmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PostEnvironment500JSONResponse ServerHttpError
+
+func (response PostEnvironment500JSONResponse) VisitPostEnvironmentResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEnvironmentInstanceIdListRequestObject struct {
+	Id     string `json:"id"`
+	Params GetEnvironmentInstanceIdListParams
+}
+
+type GetEnvironmentInstanceIdListResponseObject interface {
+	VisitGetEnvironmentInstanceIdListResponse(w http.ResponseWriter) error
+}
+
+type GetEnvironmentInstanceIdList200JSONResponse []PreviewEnvironmentInstanceModel
+
+func (response GetEnvironmentInstanceIdList200JSONResponse) VisitGetEnvironmentInstanceIdListResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEnvironmentInstanceIdList401JSONResponse ServerHttpError
+
+func (response GetEnvironmentInstanceIdList401JSONResponse) VisitGetEnvironmentInstanceIdListResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEnvironmentInstanceIdList500JSONResponse ServerHttpError
+
+func (response GetEnvironmentInstanceIdList500JSONResponse) VisitGetEnvironmentInstanceIdListResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEnvironmentListRequestObject struct {
+	Params GetEnvironmentListParams
+}
+
+type GetEnvironmentListResponseObject interface {
+	VisitGetEnvironmentListResponse(w http.ResponseWriter) error
+}
+
+type GetEnvironmentList200JSONResponse []PreviewEnvironmentModel
+
+func (response GetEnvironmentList200JSONResponse) VisitGetEnvironmentListResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetEnvironmentList500JSONResponse ServerHttpError
+
+func (response GetEnvironmentList500JSONResponse) VisitGetEnvironmentListResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteEnvironmentIdRequestObject struct {
+	Id     string `json:"id"`
+	Params DeleteEnvironmentIdParams
+}
+
+type DeleteEnvironmentIdResponseObject interface {
+	VisitDeleteEnvironmentIdResponse(w http.ResponseWriter) error
+}
+
+type DeleteEnvironmentId200JSONResponse PreviewEnvironmentModel
+
+func (response DeleteEnvironmentId200JSONResponse) VisitDeleteEnvironmentIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteEnvironmentId400JSONResponse ServerHttpError
+
+func (response DeleteEnvironmentId400JSONResponse) VisitDeleteEnvironmentIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteEnvironmentId404JSONResponse ServerHttpError
+
+func (response DeleteEnvironmentId404JSONResponse) VisitDeleteEnvironmentIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type DeleteEnvironmentId500JSONResponse ServerHttpError
+
+func (response DeleteEnvironmentId500JSONResponse) VisitDeleteEnvironmentIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetGithubRepositoriesRequestObject struct {
+	Params GetGithubRepositoriesParams
+}
+
+type GetGithubRepositoriesResponseObject interface {
+	VisitGetGithubRepositoriesResponse(w http.ResponseWriter) error
+}
+
+type GetGithubRepositories200JSONResponse []GithubRepositoryModel
+
+func (response GetGithubRepositories200JSONResponse) VisitGetGithubRepositoriesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetGithubRepositories401JSONResponse ServerHttpError
+
+func (response GetGithubRepositories401JSONResponse) VisitGetGithubRepositoriesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetGithubRepositories500JSONResponse ServerHttpError
+
+func (response GetGithubRepositories500JSONResponse) VisitGetGithubRepositoriesResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+// StrictServerInterface represents all server handlers.
+type StrictServerInterface interface {
+	// Creates a new environment
+	// (POST /environment)
+	PostEnvironment(ctx context.Context, request PostEnvironmentRequestObject) (PostEnvironmentResponseObject, error)
+	// Lists all instances of an environment
+	// (GET /environment-instance/{id}/list)
+	GetEnvironmentInstanceIdList(ctx context.Context, request GetEnvironmentInstanceIdListRequestObject) (GetEnvironmentInstanceIdListResponseObject, error)
+	// List all available Environments
+	// (GET /environment/list)
+	GetEnvironmentList(ctx context.Context, request GetEnvironmentListRequestObject) (GetEnvironmentListResponseObject, error)
+	// Deletes an environment
+	// (DELETE /environment/{id})
+	DeleteEnvironmentId(ctx context.Context, request DeleteEnvironmentIdRequestObject) (DeleteEnvironmentIdResponseObject, error)
+	// Lists all the repositories of the authenticated user
+	// (GET /github/repositories)
+	GetGithubRepositories(ctx context.Context, request GetGithubRepositoriesRequestObject) (GetGithubRepositoriesResponseObject, error)
+}
+
+type StrictHandlerFunc = strictecho.StrictEchoHandlerFunc
+type StrictMiddlewareFunc = strictecho.StrictEchoMiddlewareFunc
+
+func NewStrictHandler(ssi StrictServerInterface, middlewares []StrictMiddlewareFunc) ServerInterface {
+	return &strictHandler{ssi: ssi, middlewares: middlewares}
+}
+
+type strictHandler struct {
+	ssi         StrictServerInterface
+	middlewares []StrictMiddlewareFunc
+}
+
+// PostEnvironment operation middleware
+func (sh *strictHandler) PostEnvironment(ctx echo.Context, params PostEnvironmentParams) error {
+	var request PostEnvironmentRequestObject
+
+	request.Params = params
+
+	var body PostEnvironmentJSONRequestBody
+	if err := ctx.Bind(&body); err != nil {
+		return err
+	}
+	request.Body = &body
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PostEnvironment(ctx.Request().Context(), request.(PostEnvironmentRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PostEnvironment")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(PostEnvironmentResponseObject); ok {
+		return validResponse.VisitPostEnvironmentResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetEnvironmentInstanceIdList operation middleware
+func (sh *strictHandler) GetEnvironmentInstanceIdList(ctx echo.Context, id string, params GetEnvironmentInstanceIdListParams) error {
+	var request GetEnvironmentInstanceIdListRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEnvironmentInstanceIdList(ctx.Request().Context(), request.(GetEnvironmentInstanceIdListRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEnvironmentInstanceIdList")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetEnvironmentInstanceIdListResponseObject); ok {
+		return validResponse.VisitGetEnvironmentInstanceIdListResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetEnvironmentList operation middleware
+func (sh *strictHandler) GetEnvironmentList(ctx echo.Context, params GetEnvironmentListParams) error {
+	var request GetEnvironmentListRequestObject
+
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetEnvironmentList(ctx.Request().Context(), request.(GetEnvironmentListRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetEnvironmentList")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetEnvironmentListResponseObject); ok {
+		return validResponse.VisitGetEnvironmentListResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// DeleteEnvironmentId operation middleware
+func (sh *strictHandler) DeleteEnvironmentId(ctx echo.Context, id string, params DeleteEnvironmentIdParams) error {
+	var request DeleteEnvironmentIdRequestObject
+
+	request.Id = id
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.DeleteEnvironmentId(ctx.Request().Context(), request.(DeleteEnvironmentIdRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DeleteEnvironmentId")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(DeleteEnvironmentIdResponseObject); ok {
+		return validResponse.VisitDeleteEnvironmentIdResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetGithubRepositories operation middleware
+func (sh *strictHandler) GetGithubRepositories(ctx echo.Context, params GetGithubRepositoriesParams) error {
+	var request GetGithubRepositoriesRequestObject
+
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetGithubRepositories(ctx.Request().Context(), request.(GetGithubRepositoriesRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetGithubRepositories")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetGithubRepositoriesResponseObject); ok {
+		return validResponse.VisitGetGithubRepositoriesResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
 }

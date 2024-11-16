@@ -1,7 +1,8 @@
 package server
 
 import (
-	"fmt"
+	"context"
+	"strconv"
 
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
 	apigen "github.com/coflnet/pr-env/internal/server/openapi"
@@ -9,58 +10,48 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-type environmentInstanceModel struct {
-	Name            string                         `json:"name"`
-	GitSettings     environmentInstanceGitSettings `json:"gitSettings"`
-	BuildStatus     string                         `json:"buildStatus"`
-	PublicFacingUrl string                         `json:"publicFacingUrl"`
-	ContainerImage  string                         `json:"containerImage"`
-}
-
-type environmentInstanceGitSettings struct {
-	Branch                string `json:"branch"`
-	PullRequestIdentifier int    `json:"pullRequestIdentifier"`
-	Organization          string `json:"organization"`
-	Repository            string `json:"repository"`
-	CommitHash            string `json:"commitHash"`
-}
-
-func convertToEnvironmentInstanceModelList(in *coflnetv1alpha1.PreviewEnvironmentInstanceList) []environmentInstanceModel {
-	res := make([]environmentInstanceModel, len(in.Items))
-	for i, v := range in.Items {
-		res[i] = convertToEnvironmentInstanceModel(&v)
-	}
-	return res
-
-}
-
-func convertToEnvironmentInstanceModel(in *coflnetv1alpha1.PreviewEnvironmentInstance) environmentInstanceModel {
-	return environmentInstanceModel{
-		Name: in.Name,
-		GitSettings: environmentInstanceGitSettings{
-			Organization:          in.Spec.GitOrganization,
-			Repository:            in.Spec.GitRepository,
-			Branch:                *in.Spec.Branch,
-			CommitHash:            in.Spec.CommitHash,
-			PullRequestIdentifier: in.Spec.PullRequestNumber,
-		},
-		BuildStatus:     in.Status.RebuildStatus,
-		PublicFacingUrl: in.Status.PublicFacingUrl,
-
-		// TODO: build the container image from the props
-		ContainerImage: fmt.Sprintf("no filled yet"),
-	}
-}
-
 // List all available Environments
 // (GET /environment/list)
-func (s Server) GetEnvironmentInstanceIdList(c echo.Context, id string, params apigen.GetEnvironmentInstanceIdListParams) error {
-	owner := c.Get("user").(string)
-
-	pei, err := s.kubeClient.ListPreviewEnvironmentInstancesByPreviewEnvironmentId(c.Request().Context(), owner, types.UID(id))
+func (s Server) GetEnvironmentInstanceIdList(ctx context.Context, request apigen.GetEnvironmentInstanceIdListRequestObject) (apigen.GetEnvironmentInstanceIdListResponseObject, error) {
+	userId, err := s.userIdFromAuthenticationToken(ctx, request.Params.Authentication)
 	if err != nil {
-		return echo.NewHTTPError(500, err.Error())
+		return nil, echo.NewHTTPError(401, err.Error())
 	}
 
-	return c.JSON(200, convertToEnvironmentInstanceModelList(pei))
+	peis, err := s.kubeClient.ListPreviewEnvironmentInstancesByPreviewEnvironmentId(ctx, userId, types.UID(request.Id))
+	if err != nil {
+		return nil, echo.NewHTTPError(500, err.Error())
+	}
+
+	res := convertToEnvironmentInstanceModelList(*peis)
+	return apigen.GetEnvironmentInstanceIdList200JSONResponse(res), nil
+}
+
+func convertToEnvironmentInstanceModelList(peis coflnetv1alpha1.PreviewEnvironmentInstanceList) []apigen.PreviewEnvironmentInstanceModel {
+	res := make([]apigen.PreviewEnvironmentInstanceModel, 0, len(peis.Items))
+	for _, pei := range peis.Items {
+		res = append(res, convertToEnvironmentInstanceModel(pei))
+	}
+	return res
+}
+
+func convertToEnvironmentInstanceModel(pei coflnetv1alpha1.PreviewEnvironmentInstance) apigen.PreviewEnvironmentInstanceModel {
+	return apigen.PreviewEnvironmentInstanceModel{
+		DesiredPhase: pei.Spec.DesiredPhase,
+		InstanceGitSettings: apigen.InstanceGitSettingsModel{
+			Branch:                pei.Spec.InstanceGitSettings.Branch,
+			CommitHash:            &pei.Spec.InstanceGitSettings.CommitHash,
+			PullRequestIdentifier: intPtrToStrPtr(pei.Spec.InstanceGitSettings.PullRequestNumber),
+		},
+		Name:                 pei.GetName(),
+		OwnerId:              pei.GetOwner(),
+		PreviewEnvironmentId: pei.GetPreviewEnvironmentId(),
+	}
+}
+
+func intPtrToStrPtr(v *int) *string {
+	if v == nil {
+		return nil
+	}
+	return strPtr(strconv.Itoa(*v))
 }

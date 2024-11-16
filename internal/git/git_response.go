@@ -10,26 +10,18 @@ import (
 )
 
 func (c *GithubClient) UpdatePullRequestAnswer(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
-	// NOTE: somehow we don't need this anymore
-	// but I am pretty sure we will need the pr in the future
-	// first we have to load the pull request
-	// pr, err := c.PullRequestOfPei(ctx, pei)
-	// if err != nil {
-	// 	return err
-	// }
-
 	// then we have to figure out what the answer should be
 	message := c.messageForPrForPei(pei)
 
 	// message already exists
-	doesMessageAlreadyExists := c.pullRequestAlreadyHasMessage(ctx, pe.Spec.GitOrganization, pe.Spec.GitRepository, pei.Spec.PullRequestNumber, message)
+	doesMessageAlreadyExists := c.pullRequestAlreadyHasMessage(ctx, pe.Spec.GitSettings.Organization, pe.Spec.GitSettings.Repository, *pei.Spec.InstanceGitSettings.PullRequestNumber, message)
 	if doesMessageAlreadyExists {
-		c.log.Info("Message already exists", "owner", pe.Spec.GitOrganization, "repo", pe.Spec.GitRepository, "prNr", pei.Spec.PullRequestNumber)
+		c.log.Info("Message already exists", "owner", pe.Spec.GitSettings.Organization, "repo", pe.Spec.GitSettings.Repository, "prNr", pei.Spec.InstanceGitSettings.PullRequestNumber)
 		return nil
 	}
 
 	// then we have to update the pull request with the answer
-	return c.postMessageToPr(ctx, pe.Spec.GitOrganization, pe.Spec.GitRepository, pei.Spec.PullRequestNumber, message)
+	return c.postMessageToPr(ctx, pe.Spec.GitSettings.Organization, pe.Spec.GitSettings.Repository, *pei.Spec.InstanceGitSettings.PullRequestNumber, message)
 }
 
 func (c *GithubClient) messageForPrForPei(pei *coflnetv1alpha1.PreviewEnvironmentInstance) string {
@@ -46,7 +38,7 @@ Here you can checkout a preview version for the changes:
 
 Maybe you can already find some issues here.
 If not even better!
-	`, *pei.Spec.Branch, pei.Status.PublicFacingUrl)
+	`, *pei.Spec.InstanceGitSettings.Branch, pei.Status.PublicFacingUrl)
 }
 
 func (c *GithubClient) postMessageToPr(ctx context.Context, owner, repo string, prNr int, message string) error {

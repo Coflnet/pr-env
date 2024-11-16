@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -88,12 +89,8 @@ func (r *PreviewEnvironmentInstanceReconciler) Reconcile(ctx context.Context, re
 		return ctrl.Result{}, err
 	}
 
-	if pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusBuilding || pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusDeploying {
-		r.log.Info("instance is already being rebuilt or deployed", "namespace", pei.Namespace, "name", pei.Name)
-		return ctrl.Result{RequeueAfter: time.Second * 10}, nil
-	}
-
-	if pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusBuildingOutdated || pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusFailed || pei.Status.RebuildStatus == "" {
+	// check if the instance has to be rebuild
+	if pei.Status.Phase == coflnetv1alpha1.InstancePhasePending {
 		err := r.rebuildInstance(ctx, pe, &pei)
 		if err != nil {
 			r.log.Error(err, "unable to rebuild the PreviewEnvironmentInstance", "namespace", pei.Namespace, "name", pei.Name)
@@ -103,24 +100,19 @@ func (r *PreviewEnvironmentInstanceReconciler) Reconcile(ctx context.Context, re
 			}
 			return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 		}
-
 		r.log.Info("instance is being rebuilt", "namespace", pei.Namespace, "name", pei.Name)
-		pei.Status.RebuildStatus = coflnetv1alpha1.RebuildStatusDeploymentOutdated
-		if err := r.Status().Update(ctx, &pei); err != nil {
-			r.log.Error(err, "unable to update the PreviewEnvironmentInstance", "namespace", pei.Namespace, "name", pei.Name)
-			err = r.markPreviewEnvironmentInstanceAsFailed(ctx, &pei)
-			if err != nil {
-				r.log.Error(err, "unable to mark the PreviewEnvironmentInstance as failed", "namespace", pei.Namespace, "name", pei.Name)
-			}
+
+		err = r.markPreviewEnvironmentInstanceAsDeploying(ctx, &pei)
+		if err != nil {
+			r.log.Error(err, "unable to mark the PreviewEnvironmentInstance as deploying", "namespace", pei.Namespace, "name", pei.Name)
 			return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 		}
 
-		r.log.Info("marked the instance as deployment outdated", "namespace", pei.Namespace, "name", pei.Name)
 		return ctrl.Result{}, nil
 	}
 
-	if pei.Status.RebuildStatus == coflnetv1alpha1.RebuildStatusDeploymentOutdated {
-		r.log.Info("instance is being redeployed", "namespace", pei.Namespace, "name", pei.Name)
+	// check if the instance has to be deployed
+	if pei.Status.Phase == coflnetv1alpha1.InstancePhaseDeploying {
 		err := r.redeployInstance(ctx, pe, &pei)
 		if err != nil {
 			r.log.Error(err, "unable to redeploy the PreviewEnvironmentInstance", "namespace", pei.Namespace, "name", pei.Name)
@@ -130,68 +122,92 @@ func (r *PreviewEnvironmentInstanceReconciler) Reconcile(ctx context.Context, re
 			}
 			return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 		}
-
-		r.log.Info("instance is being redeployed", "namespace", pei.Namespace, "name", pei.Name)
-		pei.Status.RebuildStatus = coflnetv1alpha1.RebuildStatusSuccess
-		if err := r.Status().Update(ctx, &pei); err != nil {
-			r.log.Error(err, "unable to update the PreviewEnvironmentInstance", "namespace", pei.Namespace, "name", pei.Name)
-			return ctrl.Result{}, err
-		}
+		r.log.Info("instance was deployed", "namespace", pei.Namespace, "name", pei.Name)
 
 		r.log.Info("updating github pull request", "namespace", pei.Namespace, "name", pei.Name)
 		if err := r.githubClient.UpdatePullRequestAnswer(ctx, pe, &pei); err != nil {
 			r.log.Error(err, "unable to update the pull request", "namespace", pei.Namespace, "name", pei.Name)
+			err = r.markPreviewEnvironmentInstanceAsFailed(ctx, &pei)
+			if err != nil {
+				r.log.Error(err, "unable to mark the PreviewEnvironmentInstance as failed", "namespace", pei.Namespace, "name", pei.Name)
+			}
 			return ctrl.Result{RequeueAfter: time.Minute * 1}, nil
 		}
 
+		err = r.markPreviewEnvironmentInstanceAsRunning(ctx, &pei)
+		if err != nil {
+			r.log.Error(err, "unable to mark the PreviewEnvironmentInstance as running", "namespace", pei.Namespace, "name", pei.Name)
+			return ctrl.Result{RequeueAfter: time.Second * 10}, nil
+		}
+
+		return ctrl.Result{}, nil
 	}
 
-	// fetching the latest information about the pull request
-	pr, err := r.githubClient.PullRequest(ctx, pei.Spec.GitOrganization, pei.Spec.GitRepository, pei.Spec.PullRequestNumber)
+	// refresh the latest commit hash to check if the instance is outdated
+	latestCommitHash, err := r.latestCommitHashForPei(ctx, pe, &pei)
 	if err != nil {
-		r.log.Error(err, "unable to fetch pull request")
-		return ctrl.Result{RequeueAfter: time.Minute * 1}, nil
+		r.log.Error(err, "unable to get the latest commit hash", "namespace", pei.Namespace, "name", pei.Name)
+		return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 	}
 
-	// check if the pull request is closed
-	if pr.GetState() == "closed" {
-		r.log.Info("pull request is closed, we can ignore that one", "pull request number", pei.Spec.PullRequestNumber)
+	if latestCommitHash == pei.Spec.InstanceGitSettings.CommitHash {
+		r.log.Info("instance is up to date", "namespace", pei.Namespace, "name", pei.Name)
 		return ctrl.Result{}, nil
 	}
 
-	// check if the pull request is merged
-	if pr.GetMerged() {
-		r.log.Info("pull request is merged, we can ignore that one", "pull request number", pei.Spec.PullRequestNumber)
-		return ctrl.Result{}, nil
-	}
-
-	commitHash := pr.GetHead().GetSHA()
-	if pei.Spec.CommitHash == commitHash {
-		r.log.Info("commit hash is the same, don't need to update the instance", "commit hash", commitHash)
-		return ctrl.Result{}, nil
-	}
-
-	pei.Spec.CommitHash = commitHash
+	pei.Spec.InstanceGitSettings.CommitHash = latestCommitHash
 	if err := r.Update(ctx, &pei); err != nil {
 		r.log.Error(err, "unable to update the PreviewEnvironmentInstance", "namespace", pei.Namespace, "name", pei.Name)
 		return ctrl.Result{}, err
 	}
 
-	pei.Status.RebuildStatus = coflnetv1alpha1.RebuildStatusBuildingOutdated
-	if err := r.Status().Update(ctx, &pei); err != nil {
-		r.log.Error(err, "unable to update the PreviewEnvironmentInstance", "namespace", pei.Namespace, "name", pei.Name)
-		return ctrl.Result{}, err
+	err = r.markPreviewEnvironmentInstanceAsPending(ctx, &pei)
+	if err != nil {
+		r.log.Error(err, "unable to mark the PreviewEnvironmentInstance as pending", "namespace", pei.Namespace, "name", pei.Name)
+		return ctrl.Result{RequeueAfter: time.Second * 10}, nil
 	}
 
 	return ctrl.Result{}, nil
 }
 
 func (r *PreviewEnvironmentInstanceReconciler) markPreviewEnvironmentInstanceAsFailed(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
-	pei.Status.RebuildStatus = coflnetv1alpha1.RebuildStatusFailed
-	if err := r.Status().Update(ctx, pei); err != nil {
-		return err
+	return r.markPreviewEnvironmentInstanceWithStatus(ctx, pei, coflnetv1alpha1.InstancePhaseFailed)
+}
+
+func (r *PreviewEnvironmentInstanceReconciler) markPreviewEnvironmentInstanceAsRunning(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	return r.markPreviewEnvironmentInstanceWithStatus(ctx, pei, coflnetv1alpha1.InstancePhaseRunning)
+}
+
+func (r *PreviewEnvironmentInstanceReconciler) markPreviewEnvironmentInstanceAsDeploying(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	return r.markPreviewEnvironmentInstanceWithStatus(ctx, pei, coflnetv1alpha1.InstancePhaseDeploying)
+}
+
+func (r *PreviewEnvironmentInstanceReconciler) markPreviewEnvironmentInstanceAsBuilding(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	return r.markPreviewEnvironmentInstanceWithStatus(ctx, pei, coflnetv1alpha1.InstancePhaseBuilding)
+}
+
+func (r *PreviewEnvironmentInstanceReconciler) markPreviewEnvironmentInstanceAsPending(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	return r.markPreviewEnvironmentInstanceWithStatus(ctx, pei, coflnetv1alpha1.InstancePhasePending)
+}
+
+func (r *PreviewEnvironmentInstanceReconciler) markPreviewEnvironmentInstanceWithStatus(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance, status string) error {
+	pei.Status.Phase = status
+	return r.Status().Update(ctx, pei)
+}
+
+func (r *PreviewEnvironmentInstanceReconciler) latestCommitHashForPei(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) (string, error) {
+
+	// TODO: check if the pei is a branch pei
+	// and update the pull request based on that
+	if pei.Spec.InstanceGitSettings.PullRequestNumber == nil {
+		return "", fmt.Errorf("not implemented")
 	}
-	return nil
+
+	pr, err := r.githubClient.PullRequestOfPei(ctx, pe, pei)
+	if err != nil {
+		return "", err
+	}
+	return pr.GetHead().GetSHA(), nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -204,6 +220,7 @@ func (r *PreviewEnvironmentInstanceReconciler) SetupWithManager(mgr ctrl.Manager
 		Complete(r)
 }
 
+// PERF: loadPreviewEnvironmentForInstance loads the preview environment for the given instance
 func (r *PreviewEnvironmentInstanceReconciler) loadPreviewEnvironmentForInstance(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) (*coflnetv1alpha1.PreviewEnvironment, error) {
 	var peList coflnetv1alpha1.PreviewEnvironmentList
 	err := r.List(ctx, &peList, &client.ListOptions{

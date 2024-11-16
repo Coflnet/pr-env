@@ -38,26 +38,53 @@ type PreviewEnvironment struct {
 
 // PreviewEnvironmentSpec defines the desired state of PreviewEnvironment.
 type PreviewEnvironmentSpec struct {
+	// +kubebuilder:validation:Required
+	// GitSettings configuration of the git repository that should be used for the preview environments
+	GitSettings GitSettings `json:"gitSettings"`
 
-	// +kubebuilder:validation:MinLength=0
-	// +kubebuilder:validation:MaxLength=63
-	GitOrganization string `json:"gitOrganization"`
-
-	// +kubebuilder:validation:MinLength=0
-	// +kubebuilder:validation:MaxLength=63
-	GitRepository string `json:"gitRepository"`
-
-	// +optional
+	// +kubebuilder:validation:Required
 	// ContainerRegistry configuration of the container registry that should be used for the preview environments
-	ContainerRegistry ContainerRegistry `json:"containerRegistry"`
+	ContainerRegistry *ContainerRegistry `json:"containerRegistry"`
 
-	// +optional
+	// +kubebuilder:validation:Required
 	// ApplicationSettings configuration for the running application
 	ApplicationSettings ApplicationSettings `json:"applicationSettings"`
 
-	// +optional
+	// +kubebuilder:validation:Required
+	// BuildSettings configuration for the build process
+	BuildSettings BuildSettings `json:"buildSettings"`
+
+	// +kubebuilder:validation:Required
 	// DisplayName is the name that can be displayed to the user
 	DisplayName string `json:"displayName"`
+}
+
+type BuildSettings struct {
+	// +kubebuilder:validation:Required
+	// BuildAllPullRequests is a flag that can be used to build all pull requests
+	BuildAllPullRequests bool `json:"buildAllPullRequests"`
+
+	// +kubebuilder:validation:Required
+	// BuildAllBranches is a flag that can be used to build all branches
+	BuildAllBranches bool `json:"buildAllBranches"`
+
+	// +optional
+	// BranchWildcard is optional and can be used to specify a wildcard for branches that should be built
+	BranchWildcard *string `json:"branchWildcard"`
+
+	// +optional
+	// DockerfilePath is optional and can be used to override the default Dockerfile that is used to build the application
+	DockerfilePath *string `json:"dockerfile"`
+}
+
+type GitSettings struct {
+	// +kubebuilder:validation:MinLength=0
+	// +kubebuilder:validation:MaxLength=63
+	Organization string `json:"organization"`
+
+	// +kubebuilder:validation:MinLength=0
+	// +kubebuilder:validation:MaxLength=63
+	Repository string `json:"repository"`
 }
 
 type ContainerRegistry struct {
@@ -71,7 +98,6 @@ type ContainerRegistry struct {
 }
 
 type ApplicationSettings struct {
-
 	// +kubebuilder:validation:MinLength=0
 	// IngressHostname the hostname the application should get exposed on
 	IngressHostname string `json:"ingressHostname"`
@@ -79,14 +105,44 @@ type ApplicationSettings struct {
 	// +optional
 	// Port is the port the application is listening on
 	Port int `json:"port"`
+
+	// +optional
+	// EnvironmentVariables is a list of environment variables that should be set for the application
+	EnvironmentVariables *[]EnvironmentVariable `json:"environmentVariables"`
+
+	// +optional
+	// Command is optional and can be used to override the default command that is used to start the application
+	Command *string `json:"command"`
 }
 
 // PreviewEnvironmentStatus defines the observed state of PreviewEnvironment.
 type PreviewEnvironmentStatus struct {
 	// +optional
-
 	// PullRequestsDetected is a list of pullRequests that were detected
 	PullRequestsDetected []int `json:"pullRequests"`
+
+	// +optional
+	Phase string `json:"phase"`
+}
+
+const (
+	PreviewEnvironmentPhasePending    = "pending"
+	PreviewEnvironmentPhaseProcessing = "procesing"
+	PreviewEnvironmentPhaseReady      = "ready"
+	PreviewEnvironmentPhaseError      = "error"
+)
+
+type EnvironmentVariable struct {
+
+	// +kubebuilder:validation:MinLength=0
+	// +kubebuilder:validation:MaxLength=63
+	// Key is the key of the environment variable
+	Key string `json:"key"`
+
+	// +kubebuilder:validation:MinLength=0
+	// +kubebuilder:validation:MaxLength=63
+	// Value is the value of the environment variable
+	Value string `json:"value"`
 }
 
 // +kubebuilder:object:root=true
@@ -100,10 +156,17 @@ type PreviewEnvironmentList struct {
 }
 
 func PreviewEnvironmentName(organization, repo string) string {
-	str := fmt.Sprintf("%s-%s", organization, repo)
-	return strings.ToLower(str)
+	str := strings.ToLower(fmt.Sprintf("%s-%s", organization, repo))
+	if len(str) > 50 {
+		return str[len(str)-50:]
+	}
+	return str
 }
 
 func init() {
 	SchemeBuilder.Register(&PreviewEnvironment{}, &PreviewEnvironmentList{})
+}
+
+func (pe *PreviewEnvironment) GetOwner() string {
+	return pe.GetLabels()["owner"]
 }
