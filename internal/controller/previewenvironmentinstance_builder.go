@@ -54,10 +54,14 @@ func (r *PreviewEnvironmentInstanceReconciler) rebuildInstance(ctx context.Conte
 
 func (r *PreviewEnvironmentInstanceReconciler) buildContainerImage(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	job := &kbatch.Job{}
+
+	r.log.Info("Checking if job already exists", "namespace", pei.Namespace, "name", pei.Name)
 	if err := r.Get(ctx, types.NamespacedName{Name: pei.Name, Namespace: pei.Namespace}, job); err != nil {
 		if !errors.IsNotFound(err) {
+			r.log.Error(err, "Failed to get job", "namespace", pei.Namespace, "name", pei.Name)
 			return err
 		}
+		r.log.Info("Job not found, creating", "namespace", pei.Namespace, "name", pei.Name)
 	} else {
 		if job.Status.Active > 0 {
 			r.log.Info("Job already running, skipping", "namespace", pei.Namespace, "name", pei.Name)
@@ -65,6 +69,7 @@ func (r *PreviewEnvironmentInstanceReconciler) buildContainerImage(ctx context.C
 		}
 
 		if job.Status.Succeeded > 0 {
+			r.log.Info("Job already succeeded, deleting", "namespace", pei.Namespace, "name", pei.Name)
 			err = r.Delete(ctx, job)
 			if err != nil {
 				return err
@@ -72,8 +77,20 @@ func (r *PreviewEnvironmentInstanceReconciler) buildContainerImage(ctx context.C
 		}
 	}
 
-	err := r.buildAndWaitForContainerImage(ctx, pe, pei)
+	pei.Status.Phase = coflnetv1alpha1.InstancePhaseBuilding
+	err := r.Status().Update(ctx, pei)
+	if err != nil {
+		return err
+	}
+
+	err = r.buildAndWaitForContainerImage(ctx, pe, pei)
+	if err != nil {
+		r.log.Error(err, "Failed to build container image", "namespace", pei.Namespace, "name", pei.Name)
+		return err
+	}
+
 	pei.Status.BuiltVersions = updateBuiltVersions(pei.Status.BuiltVersions, pei.Spec.InstanceGitSettings.CommitHash, 10)
+	r.log.Info("Updating PreviewEnvironmentInstance status", "namespace", pei.Namespace, "name", pei.Name)
 	return err
 }
 
@@ -176,6 +193,7 @@ func (r *PreviewEnvironmentInstanceReconciler) buildAndWaitForContainerImage(ctx
 	}
 
 	counter := 0
+	time.Sleep(time.Second * 10)
 	for {
 		job := &kbatch.Job{}
 		if err := r.Get(ctx, types.NamespacedName{Name: jobName, Namespace: pei.Namespace}, job); err != nil {

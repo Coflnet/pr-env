@@ -62,11 +62,13 @@ type InstanceGitSettingsModel struct {
 
 // PreviewEnvironmentInstanceModel defines model for previewEnvironmentInstanceModel.
 type PreviewEnvironmentInstanceModel struct {
+	CurrentPhase         string                   `json:"currentPhase"`
 	DesiredPhase         string                   `json:"desiredPhase"`
 	InstanceGitSettings  InstanceGitSettingsModel `json:"instanceGitSettings"`
 	Name                 string                   `json:"name"`
 	OwnerId              string                   `json:"ownerId"`
 	PreviewEnvironmentId string                   `json:"previewEnvironmentId"`
+	PublicFacingUrl      *string                  `json:"publicFacingUrl,omitempty"`
 }
 
 // PreviewEnvironmentModel defines model for previewEnvironmentModel.

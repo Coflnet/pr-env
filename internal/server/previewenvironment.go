@@ -8,6 +8,7 @@ import (
 	apigen "github.com/coflnet/pr-env/internal/server/openapi"
 	"github.com/labstack/echo/v4"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 // List all available Environments
@@ -51,12 +52,19 @@ func (s Server) PostEnvironment(ctx context.Context, request apigen.PostEnvironm
 // Deletes an environment
 // (DELETE /environment/{id})
 func (s Server) DeleteEnvironmentId(ctx context.Context, request apigen.DeleteEnvironmentIdRequestObject) (apigen.DeleteEnvironmentIdResponseObject, error) {
-	_, err := s.userIdFromAuthenticationToken(ctx, request.Params.Authentication)
+	userId, err := s.userIdFromAuthenticationToken(ctx, request.Params.Authentication)
 	if err != nil {
 		return nil, echo.NewHTTPError(http.StatusUnauthorized, err.Error())
 	}
 
-	panic("not implemented")
+	s.log.Info("Deleting PreviewEnvironment", "id", request.Id)
+	pe, err := s.kubeClient.DeletePreviewEnvironment(ctx, userId, types.UID(request.Id))
+	if err != nil {
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	s.log.Info("Deleted PreviewEnvironment", "name", pe.GetName())
+	return apigen.DeleteEnvironmentId200JSONResponse(convertToEnvironmentModel(pe)), nil
+
 }
 
 func convertFromEnvironmentModel(userId string, in apigen.PreviewEnvironmentModel) *coflnetv1alpha1.PreviewEnvironment {
@@ -84,6 +92,7 @@ func convertFromEnvironmentModel(userId string, in apigen.PreviewEnvironmentMode
 				Command:              in.ApplicationSettings.Command,
 				EnvironmentVariables: &vars,
 				Port:                 in.ApplicationSettings.Port,
+				IngressHostname:      "tmpenv.app",
 			},
 			BuildSettings: coflnetv1alpha1.BuildSettings{
 				BranchWildcard:       in.BuildSettings.BranchWildcard,

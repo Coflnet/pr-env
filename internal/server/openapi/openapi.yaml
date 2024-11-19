@@ -6,7 +6,6 @@ info:
   contact: {}
   version: "1.0"
 servers:
-  - url: https://dash.tmpenv/api/v1
   - url: http://localhost:8080/api/v1
 paths:
   /environment:
@@ -287,10 +286,13 @@ components:
       - ownerId
       - previewEnvironmentId
       - instanceGitSettings
+      - currentPhase
       properties:
         name:
           type: string
         desiredPhase:
+          type: string
+        currentPhase:
           type: string
         ownerId:
           type: string
@@ -298,6 +300,8 @@ components:
           type: string
         instanceGitSettings:
           $ref: '#/components/schemas/instanceGitSettingsModel'
+        publicFacingUrl:
+          type: string
     instanceGitSettingsModel:
       type: object
       properties:

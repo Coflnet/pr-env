@@ -118,16 +118,20 @@ func PreviewEnvironmentInstanceNameFromBranch(pe string, owner, gitOrganization,
 }
 
 func previewEnvironmentInstanceName(pe string, owner, gitOrganization, gitRepository, identifier string) string {
-	str := strings.ToLower(fmt.Sprintf("%s-%s-%s-%s-%s", owner, pe, gitOrganization, gitRepository, identifier))
+	str := strings.ToLower(fmt.Sprintf("pei-%s-%s-%s-%s-%s", owner, pe, gitOrganization, gitRepository, identifier))
 	str = strings.ReplaceAll(str, "/", "-")
 	if len(str) > 50 {
-		return str[len(str)-50:]
+		return fmt.Sprintf("pei-%s", str[len(str)-50:])
 	}
 	return str
 }
 
 func PreviewEnvironmentInstanceContainerName(pe *PreviewEnvironment, identifier, commitHash string) string {
 	return fmt.Sprintf("%s/%s/tmpenv:%s-%s-%s-%s-%s", pe.Spec.ContainerRegistry.Registry, pe.Spec.ContainerRegistry.Repository, pe.GetOwner(), pe.Spec.GitSettings.Organization, pe.Spec.GitSettings.Repository, identifier, commitHash)
+}
+
+func PreviewEnvironmentHttpPath(pe *PreviewEnvironment, pei *PreviewEnvironmentInstance) string {
+	return fmt.Sprintf("/%s/%s/%s/%s", pe.Spec.GitSettings.Organization, pe.Spec.GitSettings.Repository, pei.BranchOrPullRequestIdentifier(), pei.Spec.InstanceGitSettings.CommitHash)
 }
 
 func (g *InstanceGitSettings) BranchOrPullRequestIdentifier() string {
@@ -150,4 +154,8 @@ func (pei *PreviewEnvironmentInstance) GetOwner() string {
 
 func (pei *PreviewEnvironmentInstance) GetPreviewEnvironmentId() string {
 	return pei.GetLabels()["previewenvironment"]
+}
+
+func (pei *PreviewEnvironmentInstance) NameForAuthProxy() string {
+	return fmt.Sprintf("%s-auth-proxy", pei.GetName())
 }

@@ -37,6 +37,7 @@ func convertToEnvironmentInstanceModelList(peis coflnetv1alpha1.PreviewEnvironme
 
 func convertToEnvironmentInstanceModel(pei coflnetv1alpha1.PreviewEnvironmentInstance) apigen.PreviewEnvironmentInstanceModel {
 	return apigen.PreviewEnvironmentInstanceModel{
+		CurrentPhase: pei.Status.Phase,
 		DesiredPhase: pei.Spec.DesiredPhase,
 		InstanceGitSettings: apigen.InstanceGitSettingsModel{
 			Branch:                pei.Spec.InstanceGitSettings.Branch,
@@ -46,6 +47,7 @@ func convertToEnvironmentInstanceModel(pei coflnetv1alpha1.PreviewEnvironmentIns
 		Name:                 pei.GetName(),
 		OwnerId:              pei.GetOwner(),
 		PreviewEnvironmentId: pei.GetPreviewEnvironmentId(),
+		PublicFacingUrl:      &pei.Status.PublicFacingUrl,
 	}
 }
 
