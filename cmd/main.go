@@ -171,7 +171,7 @@ func main() {
 	if err = (&controller.PreviewEnvironmentInstanceReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr, gc); err != nil {
+	}).SetupWithManager(mgr, gc, keycloakClient); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PreviewEnvironmentInstance")
 		os.Exit(1)
 	}

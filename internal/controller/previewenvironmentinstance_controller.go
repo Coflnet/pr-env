@@ -30,15 +30,17 @@ import (
 
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
 	"github.com/coflnet/pr-env/internal/git"
+	"github.com/coflnet/pr-env/internal/keycloak"
 	"github.com/go-logr/logr"
 )
 
 // PreviewEnvironmentInstanceReconciler reconciles a PreviewEnvironmentInstance object
 type PreviewEnvironmentInstanceReconciler struct {
 	client.Client
-	Scheme       *runtime.Scheme
-	log          logr.Logger
-	githubClient *git.GithubClient
+	Scheme         *runtime.Scheme
+	log            logr.Logger
+	githubClient   *git.GithubClient
+	keycloakClient *keycloak.KeycloakClient
 }
 
 // +kubebuilder:rbac:groups=coflnet.coflnet.com,resources=previewenvironmentinstances,verbs=get;list;watch;create;update;patch;delete
@@ -211,8 +213,9 @@ func (r *PreviewEnvironmentInstanceReconciler) latestCommitHashForPei(ctx contex
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *PreviewEnvironmentInstanceReconciler) SetupWithManager(mgr ctrl.Manager, gh *git.GithubClient) error {
+func (r *PreviewEnvironmentInstanceReconciler) SetupWithManager(mgr ctrl.Manager, gh *git.GithubClient, kClient *keycloak.KeycloakClient) error {
 	r.githubClient = gh
+	r.keycloakClient = kClient
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&coflnetv1alpha1.PreviewEnvironmentInstance{}).

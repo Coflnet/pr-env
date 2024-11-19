@@ -15,10 +15,20 @@ import (
 )
 
 func (r *PreviewEnvironmentInstanceReconciler) redeployInstance(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	if pei.Spec.InstanceGitSettings.CommitHash == "" {
+		r.log.Info("No commit hash available, skip this build", "namespace", pei.Namespace, "name", pei.Name)
+		return nil
+	}
+
 	r.log.Info("Deploying the environment instance", "namespace", pei.Namespace, "name", pei.Name)
 
 	pei.Status.Phase = coflnetv1alpha1.InstancePhaseDeploying
 	err := r.Status().Update(ctx, pei)
+	if err != nil {
+		return err
+	}
+
+	err = r.setupAuthenticationForInstance(ctx, pe, pei)
 	if err != nil {
 		return err
 	}
@@ -287,6 +297,7 @@ func (r *PreviewEnvironmentInstanceReconciler) deployAuthenticationProxyDeployme
 								fmt.Sprintf("--client-secret=%s", authProxyOauthClientSecret()),
 								fmt.Sprintf("--redirect-url=%s", redirectUrl),
 								fmt.Sprintf("--oidc-issuer-url=%s", authProxyOauthIssuerUrl()),
+								fmt.Sprintf("--allowed-group=%s", pei.GetName()),
 								"--code-challenge-method=S256",
 								"--standard-logging",
 								"--auth-logging",
@@ -544,6 +555,10 @@ func (r *PreviewEnvironmentInstanceReconciler) deleteKubernetesIngress(ctx conte
 
 func envFromPe(pe *coflnetv1alpha1.PreviewEnvironment) []corev1.EnvVar {
 	res := []corev1.EnvVar{}
+	if pe.Spec.ApplicationSettings.EnvironmentVariables == nil {
+		return res
+	}
+
 	for _, v := range *pe.Spec.ApplicationSettings.EnvironmentVariables {
 		res = append(res, corev1.EnvVar{
 			Name:  v.Key,

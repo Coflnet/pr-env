@@ -225,14 +225,14 @@ func createInstanceFromEnvironment(pe coflnetv1alpha1.PreviewEnvironment, name s
 
 func (r *PreviewEnvironmentReconciler) savePreviewEnvironmentInstances(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, peis []*coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	for _, pei := range peis {
-		if err := r.savePreviewEnvironmentInstance(ctx, pe, pei); err != nil {
+		if err := r.savePreviewEnvironmentInstance(ctx, pei); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *PreviewEnvironmentReconciler) savePreviewEnvironmentInstance(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+func (r *PreviewEnvironmentReconciler) savePreviewEnvironmentInstance(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	r.log.Info("saving preview environment instance", "namespace", pei.Namespace, "name", pei.Name)
 
 	existingPei := &coflnetv1alpha1.PreviewEnvironmentInstance{

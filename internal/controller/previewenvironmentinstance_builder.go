@@ -22,6 +22,11 @@ const (
 )
 
 func (r *PreviewEnvironmentInstanceReconciler) rebuildInstance(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+	if pei.Spec.InstanceGitSettings.CommitHash == "" {
+		r.log.Info("No commit hash available, skip this build", "namespace", pei.Namespace, "name", pei.Name)
+		return nil
+	}
+
 	// check if a build version is already available
 	builtAvailable := false
 	if pei.Status.BuiltVersions != nil {
