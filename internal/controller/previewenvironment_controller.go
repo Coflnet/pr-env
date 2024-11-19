@@ -172,7 +172,7 @@ func (r *PreviewEnvironmentReconciler) buildPreviewEnvironmentInstanceForPr(pe c
 		pe.GetOwner(),
 		pe.Spec.GitSettings.Organization,
 		pe.Spec.GitSettings.Repository,
-		int(pullRequest.GetID()),
+		int(pullRequest.GetNumber()),
 	)
 
 	gitSettings := coflnetv1alpha1.InstanceGitSettings{

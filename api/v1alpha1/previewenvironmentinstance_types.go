@@ -120,8 +120,8 @@ func PreviewEnvironmentInstanceNameFromBranch(pe string, owner, gitOrganization,
 func previewEnvironmentInstanceName(pe string, owner, gitOrganization, gitRepository, identifier string) string {
 	str := strings.ToLower(fmt.Sprintf("pei-%s-%s-%s-%s-%s", owner, pe, gitOrganization, gitRepository, identifier))
 	str = strings.ReplaceAll(str, "/", "-")
-	if len(str) > 50 {
-		return fmt.Sprintf("pei-%s", str[len(str)-50:])
+	if len(str) > 45 {
+		return fmt.Sprintf("pei-%s", str[len(str)-45:])
 	}
 	return str
 }
