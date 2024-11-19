@@ -463,7 +463,20 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesIngress(ctx conte
 			Name:      pei.GetName(),
 			Namespace: pei.GetNamespace(),
 			Annotations: map[string]string{
-				"nginx.ingress.kubernetes.io/rewrite-target": "/",
+				"nginx.ingress.kubernetes.io/rewrite-target":        "/",
+				"cert-manager.io/cluster-issuer":                    "letsencrypt-prod",
+				"nginx.ingress.kubernetes.io/auth-response-headers": "Authorization",
+				"nginx.ingress.kubernetes.io/auth-signin":           "https://$host/oauth2/start?rd=$escaped_request_uri",
+				"nginx.ingress.kubernetes.io/proxy-buffer-size":     "512k",
+				"nginx.ingress.kubernetes.io/auth-url":              "https://$host/oauth2/auth",
+				"nginx.ingress.kubernetes.io/configuration-snippet": `
+    				  auth_request_set $name_upstream_1 $upstream_cookie_name_1;
+    				  access_by_lua_block {
+    				    if ngx.var.name_upstream_1 ~= "" then
+    				      ngx.header["Set-Cookie"] = "name_1=" .. ngx.var.name_upstream_1 .. ngx.var.auth_cookie:match("(; .*)")
+    				    end
+    				  }
+				`,
 			},
 		},
 		Spec: networkingv1.IngressSpec{
