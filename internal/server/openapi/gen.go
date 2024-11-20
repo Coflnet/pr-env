@@ -58,6 +58,12 @@ type GithubRepositoryModel struct {
 	Owner string `json:"owner"`
 }
 
+// GithubUsernameSearchResponseModel defines model for githubUsernameSearchResponseModel.
+type GithubUsernameSearchResponseModel struct {
+	UserId   string `json:"userId"`
+	Username string `json:"username"`
+}
+
 // InstanceGitSettingsModel defines model for instanceGitSettingsModel.
 type InstanceGitSettingsModel struct {
 	Branch                *string `json:"branch,omitempty"`
@@ -122,6 +128,12 @@ type GetGithubRepositoriesParams struct {
 	Authentication string `json:"authentication"`
 }
 
+// GetGithubUserIdForUsernameUsernameParams defines parameters for GetGithubUserIdForUsernameUsername.
+type GetGithubUserIdForUsernameUsernameParams struct {
+	// Authentication Authentication token
+	Authentication string `json:"authentication"`
+}
+
 // PostEnvironmentJSONRequestBody defines body for PostEnvironment for application/json ContentType.
 type PostEnvironmentJSONRequestBody = PreviewEnvironmentModel
 
@@ -142,6 +154,9 @@ type ServerInterface interface {
 	// Lists all the repositories of the authenticated user
 	// (GET /github/repositories)
 	GetGithubRepositories(ctx echo.Context, params GetGithubRepositoriesParams) error
+	// Get the userId for a given username
+	// (GET /github/userIdForUsername/{username})
+	GetGithubUserIdForUsernameUsername(ctx echo.Context, username string, params GetGithubUserIdForUsernameUsernameParams) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
@@ -318,6 +333,44 @@ func (w *ServerInterfaceWrapper) GetGithubRepositories(ctx echo.Context) error {
 	return err
 }
 
+// GetGithubUserIdForUsernameUsername converts echo context to params.
+func (w *ServerInterfaceWrapper) GetGithubUserIdForUsernameUsername(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "username" -------------
+	var username string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "username", ctx.Param("username"), &username, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter username: %s", err))
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetGithubUserIdForUsernameUsernameParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "authentication" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("authentication")]; found {
+		var Authentication string
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for authentication, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "authentication", valueList[0], &Authentication, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter authentication: %s", err))
+		}
+
+		params.Authentication = Authentication
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter authentication is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetGithubUserIdForUsernameUsername(ctx, username, params)
+	return err
+}
+
 // This is a simple interface which specifies echo.Route addition functions which
 // are present on both echo.Echo and echo.Group, since we want to allow using
 // either of them for path registration
@@ -351,6 +404,7 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 	router.GET(baseURL+"/environment/list", wrapper.GetEnvironmentList)
 	router.DELETE(baseURL+"/environment/:id", wrapper.DeleteEnvironmentId)
 	router.GET(baseURL+"/github/repositories", wrapper.GetGithubRepositories)
+	router.GET(baseURL+"/github/userIdForUsername/:username", wrapper.GetGithubUserIdForUsernameUsername)
 
 }
 
@@ -541,6 +595,51 @@ func (response GetGithubRepositories500JSONResponse) VisitGetGithubRepositoriesR
 	return json.NewEncoder(w).Encode(response)
 }
 
+type GetGithubUserIdForUsernameUsernameRequestObject struct {
+	Username string `json:"username"`
+	Params   GetGithubUserIdForUsernameUsernameParams
+}
+
+type GetGithubUserIdForUsernameUsernameResponseObject interface {
+	VisitGetGithubUserIdForUsernameUsernameResponse(w http.ResponseWriter) error
+}
+
+type GetGithubUserIdForUsernameUsername200JSONResponse GithubUsernameSearchResponseModel
+
+func (response GetGithubUserIdForUsernameUsername200JSONResponse) VisitGetGithubUserIdForUsernameUsernameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetGithubUserIdForUsernameUsername401JSONResponse ServerHttpError
+
+func (response GetGithubUserIdForUsernameUsername401JSONResponse) VisitGetGithubUserIdForUsernameUsernameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetGithubUserIdForUsernameUsername404JSONResponse ServerHttpError
+
+func (response GetGithubUserIdForUsernameUsername404JSONResponse) VisitGetGithubUserIdForUsernameUsernameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetGithubUserIdForUsernameUsername500JSONResponse ServerHttpError
+
+func (response GetGithubUserIdForUsernameUsername500JSONResponse) VisitGetGithubUserIdForUsernameUsernameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 	// Creates a new environment
@@ -558,6 +657,9 @@ type StrictServerInterface interface {
 	// Lists all the repositories of the authenticated user
 	// (GET /github/repositories)
 	GetGithubRepositories(ctx context.Context, request GetGithubRepositoriesRequestObject) (GetGithubRepositoriesResponseObject, error)
+	// Get the userId for a given username
+	// (GET /github/userIdForUsername/{username})
+	GetGithubUserIdForUsernameUsername(ctx context.Context, request GetGithubUserIdForUsernameUsernameRequestObject) (GetGithubUserIdForUsernameUsernameResponseObject, error)
 }
 
 type StrictHandlerFunc = strictecho.StrictEchoHandlerFunc
@@ -699,6 +801,32 @@ func (sh *strictHandler) GetGithubRepositories(ctx echo.Context, params GetGithu
 		return err
 	} else if validResponse, ok := response.(GetGithubRepositoriesResponseObject); ok {
 		return validResponse.VisitGetGithubRepositoriesResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// GetGithubUserIdForUsernameUsername operation middleware
+func (sh *strictHandler) GetGithubUserIdForUsernameUsername(ctx echo.Context, username string, params GetGithubUserIdForUsernameUsernameParams) error {
+	var request GetGithubUserIdForUsernameUsernameRequestObject
+
+	request.Username = username
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetGithubUserIdForUsernameUsername(ctx.Request().Context(), request.(GetGithubUserIdForUsernameUsernameRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetGithubUserIdForUsernameUsername")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetGithubUserIdForUsernameUsernameResponseObject); ok {
+		return validResponse.VisitGetGithubUserIdForUsernameUsernameResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}

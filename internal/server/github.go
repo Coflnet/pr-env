@@ -35,6 +35,8 @@ func strPtr(s string) *string {
 	return &s
 }
 
+// Lists all the repositories of the authenticated user
+// (GET /github/repositories)
 func (s Server) GetGithubRepositories(ctx context.Context, request apigen.GetGithubRepositoriesRequestObject) (apigen.GetGithubRepositoriesResponseObject, error) {
 	owner, err := s.userIdFromAuthenticationToken(ctx, request.Params.Authentication)
 	if err != nil {
@@ -61,6 +63,32 @@ func (s Server) GetGithubRepositories(ctx context.Context, request apigen.GetGit
 
 	s.log.Info("Found repositories", "count", len(repos.Repositories))
 	return apigen.GetGithubRepositories200JSONResponse(s.convertToGithubRepositoryModelList(repos.Repositories)), nil
+}
+
+// Get the userId for a given username
+// (GET /github/userIdForUsername/{username})
+func (s Server) GetGithubUserIdForUsernameUsername(ctx context.Context, request apigen.GetGithubUserIdForUsernameUsernameRequestObject) (apigen.GetGithubUserIdForUsernameUsernameResponseObject, error) {
+	_, err := s.userIdFromAuthenticationToken(ctx, request.Params.Authentication)
+	if err != nil {
+		return nil, echo.NewHTTPError(401, err.Error())
+	}
+
+	user, err := s.keycloakClient.UserByUsername(ctx, request.Username)
+	if err != nil {
+		if _, ok := err.(keycloak.UserNotFound); ok {
+			s.log.Info("User not found", "username", request.Username)
+			return nil, echo.NewHTTPError(404, "User not found")
+		}
+
+		s.log.Error(err, "Unable to get user by username", "username", request.Username)
+		return nil, echo.NewHTTPError(500, err.Error())
+	}
+
+	return apigen.GetGithubUserIdForUsernameUsername200JSONResponse(apigen.GithubUsernameSearchResponseModel{
+		UserId:   *user.ID,
+		Username: request.Username,
+	}), nil
+
 }
 
 func (s Server) ConfigureInstallation(c echo.Context) error {

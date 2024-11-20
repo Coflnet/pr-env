@@ -76,6 +76,29 @@ func (k *KeycloakClient) GithubInstallationIdForUser(ctx context.Context, id str
 	return installationId, nil
 }
 
+// UserByUsername returns the user with the given username
+// if the user does not exist, a UserNotFound error is returned
+func (k *KeycloakClient) UserByUsername(ctx context.Context, username string) (*gocloak.User, error) {
+	c := k.client()
+	t := k.adminToken(c)
+
+	users, err := c.GetUsers(ctx, t.AccessToken, realm(), gocloak.GetUsersParams{
+		Username: &username,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	if len(users) == 0 {
+		return nil, UserNotFound{
+			ID: 0,
+		}
+	}
+
+	return users[0], nil
+}
+
 func (k *KeycloakClient) UserByGithubId(ctx context.Context, id int) (*gocloak.User, error) {
 	c := k.client()
 	t := k.adminToken(c)

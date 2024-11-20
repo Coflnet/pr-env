@@ -200,6 +200,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/server.httpError'
+  /github/userIdForUsername/{username}:
+    get:
+      tags:
+        - github
+      summary: Get the userId for a given username
+      description: Get the userId for a given username
+      parameters:
+        - name: username
+          in: path
+          description: Username to get the userId for
+          required: true
+          schema:
+            type: string
+        - name: authentication
+          in: header
+          description: Authentication token
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/githubUsernameSearchResponseModel'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.httpError'
+        "404":
+          description: User Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.httpError'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.httpError'
 components:
   schemas:
     previewEnvironmentModel:
@@ -333,7 +377,16 @@ components:
           type: string
         owner:
           type: string
-        
+    githubUsernameSearchResponseModel:
+      type: object
+      required:
+      - userId
+      - username
+      properties:
+        userId:
+          type: string
+        username:
+          type: string
     server.httpError:
       type: object
       properties:
