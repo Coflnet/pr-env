@@ -46,10 +46,10 @@ func (r *PreviewEnvironmentInstanceReconciler) addUsersToGroup(ctx context.Conte
 	}
 
 	// add the users to the group
-	r.log.Info("Adding users to the group", "group", pei.GetName(), "userIds", len(pe.Spec.AccessSettings.AllowedUserIds))
-	for _, userId := range pe.Spec.AccessSettings.AllowedUserIds {
-		r.log.Info("Adding user to group", "user", userId, "group", pei.GetName())
-		err := r.keycloakClient.AddUserToGroup(ctx, userId, pei.GetName())
+	r.log.Info("Adding users to the group", "group", pei.GetName(), "userIds", len(pe.Spec.AccessSettings.Users))
+	for _, user := range pe.Spec.AccessSettings.Users {
+		r.log.Info("Adding user to group", "user", user, "group", pei.GetName())
+		err := r.keycloakClient.AddUserToGroup(ctx, user.UserId, pei.GetName())
 		if err != nil {
 			return err
 		}

@@ -2,11 +2,13 @@ package server
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 
 	coflnetv1alpha1 "github.com/coflnet/pr-env/api/v1alpha1"
 	apigen "github.com/coflnet/pr-env/internal/server/openapi"
 	"github.com/labstack/echo/v4"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -67,6 +69,71 @@ func (s Server) DeleteEnvironmentId(ctx context.Context, request apigen.DeleteEn
 
 }
 
+// Add a user to an environment
+// (PATCH /environment/addUser/{id})
+func (s Server) PatchEnvironmentAddUserEnvironmentIdUserId(ctx context.Context, request apigen.PatchEnvironmentAddUserEnvironmentIdUserIdRequestObject) (apigen.PatchEnvironmentAddUserEnvironmentIdUserIdResponseObject, error) {
+	userId, err := s.userIdFromAuthenticationToken(ctx, request.Params.Authentication)
+	if err != nil {
+		return nil, echo.NewHTTPError(http.StatusUnauthorized, err.Error())
+	}
+
+	pe, err := s.kubeClient.PreviewEnvironmentById(ctx, userId, types.UID(request.EnvironmentId))
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, echo.NewHTTPError(http.StatusNotFound, fmt.Errorf("environment with id %s not found", request.EnvironmentId))
+		}
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	for _, u := range pe.Spec.AccessSettings.Users {
+		if u.UserId == request.UserId {
+			return nil, echo.NewHTTPError(http.StatusConflict, fmt.Errorf("user with id %s already exists", request.UserId))
+		}
+	}
+
+	pe.Spec.AccessSettings.Users = append(pe.Spec.AccessSettings.Users, coflnetv1alpha1.UserAccess{
+		UserId: request.UserId,
+	})
+
+	err = s.kubeClient.UpdatePreviewEnvironment(ctx, pe)
+	if err != nil {
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return apigen.PatchEnvironmentAddUserEnvironmentIdUserId200JSONResponse(convertToEnvironmentModel(pe)), nil
+}
+
+// Remove a user from an environment
+// (PATCH /environment/removeUser/{id})
+func (s Server) PatchEnvironmentRemoveUserEnvironmentIdUserId(ctx context.Context, request apigen.PatchEnvironmentRemoveUserEnvironmentIdUserIdRequestObject) (apigen.PatchEnvironmentRemoveUserEnvironmentIdUserIdResponseObject, error) {
+	userId, err := s.userIdFromAuthenticationToken(ctx, request.Params.Authentication)
+	if err != nil {
+		return nil, echo.NewHTTPError(http.StatusUnauthorized, err.Error())
+	}
+
+	pe, err := s.kubeClient.PreviewEnvironmentById(ctx, userId, types.UID(request.EnvironmentId))
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, echo.NewHTTPError(http.StatusNotFound, fmt.Errorf("environment with id %s not found", request.EnvironmentId))
+		}
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	for i, u := range pe.Spec.AccessSettings.Users {
+		if u.UserId == request.UserId {
+			pe.Spec.AccessSettings.Users = append(pe.Spec.AccessSettings.Users[:i], pe.Spec.AccessSettings.Users[i+1:]...)
+			break
+		}
+	}
+
+	err = s.kubeClient.UpdatePreviewEnvironment(ctx, pe)
+	if err != nil {
+		return nil, echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return apigen.PatchEnvironmentRemoveUserEnvironmentIdUserId200JSONResponse(convertToEnvironmentModel(pe)), nil
+}
+
 func convertFromEnvironmentModel(userId string, in apigen.PreviewEnvironmentModel) *coflnetv1alpha1.PreviewEnvironment {
 	name := coflnetv1alpha1.PreviewEnvironmentName(in.GitSettings.Organization, in.GitSettings.Repository)
 	vars := make([]coflnetv1alpha1.EnvironmentVariable, 0)
@@ -88,9 +155,7 @@ func convertFromEnvironmentModel(userId string, in apigen.PreviewEnvironmentMode
 			},
 		},
 		Spec: coflnetv1alpha1.PreviewEnvironmentSpec{
-			AccessSettings: coflnetv1alpha1.AccessSettings{
-				AllowedUserIds: in.AccessSettings.UserIds,
-			},
+			AccessSettings: coflnetv1alpha1.AccessSettings{},
 			ApplicationSettings: coflnetv1alpha1.ApplicationSettings{
 				Command:              in.ApplicationSettings.Command,
 				EnvironmentVariables: &vars,
@@ -133,9 +198,7 @@ func convertToEnvironmentModel(in *coflnetv1alpha1.PreviewEnvironment) apigen.Pr
 	}
 
 	return apigen.PreviewEnvironmentModel{
-		AccessSettings: apigen.AccessSettingsModel{
-			UserIds: in.Spec.AccessSettings.AllowedUserIds,
-		},
+		AccessSettings: apigen.AccessSettingsModel{},
 		ApplicationSettings: apigen.ApplicationSettingsModel{
 			Command:              in.Spec.ApplicationSettings.Command,
 			EnvironmentVariables: &vars,

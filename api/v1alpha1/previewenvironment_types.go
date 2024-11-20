@@ -121,9 +121,24 @@ type ApplicationSettings struct {
 
 type AccessSettings struct {
 	// +kubebuilder:validation:Required
-	// AllowedUserIds is a list of user ids that are allowed to access the preview environment
-	// the ids are the keycloak user ids
-	AllowedUserIds []string `json:"allowedUserIds"`
+	// Users is a list of users that should have access to the preview environment
+	Users []UserAccess `json:"users"`
+
+	// +kubebuilder:validation:Required
+	// PublicAccess is a flag that can be used to allow public access to the preview environment
+	PublicAccess bool `json:"publicAccess"`
+}
+
+type UserAccess struct {
+	// +kubebuilder:validation:MinLength=0
+	// +kubebuilder:validation:MaxLength=63
+	// Username is the username of the user
+	Username string `json:"username"`
+
+	// +kubebuilder:validation:MinLength=0
+	// +kubebuilder:validation:MaxLength=63
+	// UserId is the keycloak id of the user
+	UserId string `json:"userId"`
 }
 
 // PreviewEnvironmentStatus defines the observed state of PreviewEnvironment.

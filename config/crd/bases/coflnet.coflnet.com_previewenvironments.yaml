@@ -43,15 +43,33 @@ spec:
               accessSettings:
                 description: AccessSettings configuration for the access control
                 properties:
-                  allowedUserIds:
-                    description: |-
-                      AllowedUserIds is a list of user ids that are allowed to access the preview environment
-                      the ids are the keycloak user ids
+                  publicAccess:
+                    description: PublicAccess is a flag that can be used to allow
+                      public access to the preview environment
+                    type: boolean
+                  users:
+                    description: Users is a list of users that should have access
+                      to the preview environment
                     items:
-                      type: string
+                      properties:
+                        userId:
+                          description: UserId is the keycloak id of the user
+                          maxLength: 63
+                          minLength: 0
+                          type: string
+                        username:
+                          description: Username is the username of the user
+                          maxLength: 63
+                          minLength: 0
+                          type: string
+                      required:
+                      - userId
+                      - username
+                      type: object
                     type: array
                 required:
-                - allowedUserIds
+                - publicAccess
+                - users
                 type: object
               applicationSettings:
                 description: ApplicationSettings configuration for the running application

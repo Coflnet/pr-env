@@ -104,6 +104,15 @@ func (k *KubeClient) CreatePreviewEnvironment(ctx context.Context, pe *coflnetv1
 	return nil
 }
 
+func (k *KubeClient) UpdatePreviewEnvironment(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment) error {
+	k.log.Info("Updating PreviewEnvironment in the cluster", "name", pe.Name)
+	err := k.kClient.Update(ctx, pe)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (k *KubeClient) DeletePreviewEnvironment(ctx context.Context, owner string, id types.UID) (*coflnetv1alpha1.PreviewEnvironment, error) {
 	k.log.Info("Deleting PreviewEnvironment from the cluster", "id", id)
 	pe, err := k.PreviewEnvironmentById(ctx, owner, id)

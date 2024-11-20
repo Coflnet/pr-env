@@ -95,7 +95,13 @@ type PreviewEnvironmentModel struct {
 
 // ServerHttpError defines model for server.httpError.
 type ServerHttpError struct {
-	Message *map[string]interface{} `json:"message,omitempty"`
+	Message *string `json:"message,omitempty"`
+}
+
+// GetAccountUserIdForUsernameUsernameParams defines parameters for GetAccountUserIdForUsernameUsername.
+type GetAccountUserIdForUsernameUsernameParams struct {
+	// Authentication Authentication token
+	Authentication string `json:"authentication"`
 }
 
 // PostEnvironmentParams defines parameters for PostEnvironment.
@@ -110,8 +116,20 @@ type GetEnvironmentInstanceIdListParams struct {
 	Authentication string `json:"authentication"`
 }
 
+// PatchEnvironmentAddUserEnvironmentIdUserIdParams defines parameters for PatchEnvironmentAddUserEnvironmentIdUserId.
+type PatchEnvironmentAddUserEnvironmentIdUserIdParams struct {
+	// Authentication Authentication token
+	Authentication string `json:"authentication"`
+}
+
 // GetEnvironmentListParams defines parameters for GetEnvironmentList.
 type GetEnvironmentListParams struct {
+	// Authentication Authentication token
+	Authentication string `json:"authentication"`
+}
+
+// PatchEnvironmentRemoveUserEnvironmentIdUserIdParams defines parameters for PatchEnvironmentRemoveUserEnvironmentIdUserId.
+type PatchEnvironmentRemoveUserEnvironmentIdUserIdParams struct {
 	// Authentication Authentication token
 	Authentication string `json:"authentication"`
 }
@@ -128,40 +146,78 @@ type GetGithubRepositoriesParams struct {
 	Authentication string `json:"authentication"`
 }
 
-// GetGithubUserIdForUsernameUsernameParams defines parameters for GetGithubUserIdForUsernameUsername.
-type GetGithubUserIdForUsernameUsernameParams struct {
-	// Authentication Authentication token
-	Authentication string `json:"authentication"`
-}
-
 // PostEnvironmentJSONRequestBody defines body for PostEnvironment for application/json ContentType.
 type PostEnvironmentJSONRequestBody = PreviewEnvironmentModel
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Get the userId for a given username
+	// (GET /account/userIdForUsername/{username})
+	GetAccountUserIdForUsernameUsername(ctx echo.Context, username string, params GetAccountUserIdForUsernameUsernameParams) error
 	// Creates a new environment
 	// (POST /environment)
 	PostEnvironment(ctx echo.Context, params PostEnvironmentParams) error
 	// Lists all instances of an environment
 	// (GET /environment-instance/{id}/list)
 	GetEnvironmentInstanceIdList(ctx echo.Context, id string, params GetEnvironmentInstanceIdListParams) error
+	// Add a user to an environment
+	// (PATCH /environment/addUser/{environmentId}/{userId})
+	PatchEnvironmentAddUserEnvironmentIdUserId(ctx echo.Context, environmentId string, userId string, params PatchEnvironmentAddUserEnvironmentIdUserIdParams) error
 	// List all available Environments
 	// (GET /environment/list)
 	GetEnvironmentList(ctx echo.Context, params GetEnvironmentListParams) error
+	// Remove a user from an environment
+	// (PATCH /environment/removeUser/{environmentId}/{userId})
+	PatchEnvironmentRemoveUserEnvironmentIdUserId(ctx echo.Context, environmentId string, userId string, params PatchEnvironmentRemoveUserEnvironmentIdUserIdParams) error
 	// Deletes an environment
 	// (DELETE /environment/{id})
 	DeleteEnvironmentId(ctx echo.Context, id string, params DeleteEnvironmentIdParams) error
 	// Lists all the repositories of the authenticated user
 	// (GET /github/repositories)
 	GetGithubRepositories(ctx echo.Context, params GetGithubRepositoriesParams) error
-	// Get the userId for a given username
-	// (GET /github/userIdForUsername/{username})
-	GetGithubUserIdForUsernameUsername(ctx echo.Context, username string, params GetGithubUserIdForUsernameUsernameParams) error
 }
 
 // ServerInterfaceWrapper converts echo contexts to parameters.
 type ServerInterfaceWrapper struct {
 	Handler ServerInterface
+}
+
+// GetAccountUserIdForUsernameUsername converts echo context to params.
+func (w *ServerInterfaceWrapper) GetAccountUserIdForUsernameUsername(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "username" -------------
+	var username string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "username", ctx.Param("username"), &username, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter username: %s", err))
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAccountUserIdForUsernameUsernameParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "authentication" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("authentication")]; found {
+		var Authentication string
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for authentication, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "authentication", valueList[0], &Authentication, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter authentication: %s", err))
+		}
+
+		params.Authentication = Authentication
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter authentication is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.GetAccountUserIdForUsernameUsername(ctx, username, params)
+	return err
 }
 
 // PostEnvironment converts echo context to params.
@@ -233,6 +289,52 @@ func (w *ServerInterfaceWrapper) GetEnvironmentInstanceIdList(ctx echo.Context) 
 	return err
 }
 
+// PatchEnvironmentAddUserEnvironmentIdUserId converts echo context to params.
+func (w *ServerInterfaceWrapper) PatchEnvironmentAddUserEnvironmentIdUserId(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "environmentId" -------------
+	var environmentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentId", ctx.Param("environmentId"), &environmentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter environmentId: %s", err))
+	}
+
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PatchEnvironmentAddUserEnvironmentIdUserIdParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "authentication" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("authentication")]; found {
+		var Authentication string
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for authentication, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "authentication", valueList[0], &Authentication, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter authentication: %s", err))
+		}
+
+		params.Authentication = Authentication
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter authentication is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PatchEnvironmentAddUserEnvironmentIdUserId(ctx, environmentId, userId, params)
+	return err
+}
+
 // GetEnvironmentList converts echo context to params.
 func (w *ServerInterfaceWrapper) GetEnvironmentList(ctx echo.Context) error {
 	var err error
@@ -261,6 +363,52 @@ func (w *ServerInterfaceWrapper) GetEnvironmentList(ctx echo.Context) error {
 
 	// Invoke the callback with all the unmarshaled arguments
 	err = w.Handler.GetEnvironmentList(ctx, params)
+	return err
+}
+
+// PatchEnvironmentRemoveUserEnvironmentIdUserId converts echo context to params.
+func (w *ServerInterfaceWrapper) PatchEnvironmentRemoveUserEnvironmentIdUserId(ctx echo.Context) error {
+	var err error
+	// ------------- Path parameter "environmentId" -------------
+	var environmentId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "environmentId", ctx.Param("environmentId"), &environmentId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter environmentId: %s", err))
+	}
+
+	// ------------- Path parameter "userId" -------------
+	var userId string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "userId", ctx.Param("userId"), &userId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
+	if err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter userId: %s", err))
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PatchEnvironmentRemoveUserEnvironmentIdUserIdParams
+
+	headers := ctx.Request().Header
+	// ------------- Required header parameter "authentication" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("authentication")]; found {
+		var Authentication string
+		n := len(valueList)
+		if n != 1 {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for authentication, got %d", n))
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "authentication", valueList[0], &Authentication, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter authentication: %s", err))
+		}
+
+		params.Authentication = Authentication
+	} else {
+		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter authentication is required, but not found"))
+	}
+
+	// Invoke the callback with all the unmarshaled arguments
+	err = w.Handler.PatchEnvironmentRemoveUserEnvironmentIdUserId(ctx, environmentId, userId, params)
 	return err
 }
 
@@ -333,44 +481,6 @@ func (w *ServerInterfaceWrapper) GetGithubRepositories(ctx echo.Context) error {
 	return err
 }
 
-// GetGithubUserIdForUsernameUsername converts echo context to params.
-func (w *ServerInterfaceWrapper) GetGithubUserIdForUsernameUsername(ctx echo.Context) error {
-	var err error
-	// ------------- Path parameter "username" -------------
-	var username string
-
-	err = runtime.BindStyledParameterWithOptions("simple", "username", ctx.Param("username"), &username, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true})
-	if err != nil {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter username: %s", err))
-	}
-
-	// Parameter object where we will unmarshal all parameters from the context
-	var params GetGithubUserIdForUsernameUsernameParams
-
-	headers := ctx.Request().Header
-	// ------------- Required header parameter "authentication" -------------
-	if valueList, found := headers[http.CanonicalHeaderKey("authentication")]; found {
-		var Authentication string
-		n := len(valueList)
-		if n != 1 {
-			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Expected one value for authentication, got %d", n))
-		}
-
-		err = runtime.BindStyledParameterWithOptions("simple", "authentication", valueList[0], &Authentication, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true})
-		if err != nil {
-			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Invalid format for parameter authentication: %s", err))
-		}
-
-		params.Authentication = Authentication
-	} else {
-		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("Header parameter authentication is required, but not found"))
-	}
-
-	// Invoke the callback with all the unmarshaled arguments
-	err = w.Handler.GetGithubUserIdForUsernameUsername(ctx, username, params)
-	return err
-}
-
 // This is a simple interface which specifies echo.Route addition functions which
 // are present on both echo.Echo and echo.Group, since we want to allow using
 // either of them for path registration
@@ -399,13 +509,60 @@ func RegisterHandlersWithBaseURL(router EchoRouter, si ServerInterface, baseURL 
 		Handler: si,
 	}
 
+	router.GET(baseURL+"/account/userIdForUsername/:username", wrapper.GetAccountUserIdForUsernameUsername)
 	router.POST(baseURL+"/environment", wrapper.PostEnvironment)
 	router.GET(baseURL+"/environment-instance/:id/list", wrapper.GetEnvironmentInstanceIdList)
+	router.PATCH(baseURL+"/environment/addUser/:environmentId/:userId", wrapper.PatchEnvironmentAddUserEnvironmentIdUserId)
 	router.GET(baseURL+"/environment/list", wrapper.GetEnvironmentList)
+	router.PATCH(baseURL+"/environment/removeUser/:environmentId/:userId", wrapper.PatchEnvironmentRemoveUserEnvironmentIdUserId)
 	router.DELETE(baseURL+"/environment/:id", wrapper.DeleteEnvironmentId)
 	router.GET(baseURL+"/github/repositories", wrapper.GetGithubRepositories)
-	router.GET(baseURL+"/github/userIdForUsername/:username", wrapper.GetGithubUserIdForUsernameUsername)
 
+}
+
+type GetAccountUserIdForUsernameUsernameRequestObject struct {
+	Username string `json:"username"`
+	Params   GetAccountUserIdForUsernameUsernameParams
+}
+
+type GetAccountUserIdForUsernameUsernameResponseObject interface {
+	VisitGetAccountUserIdForUsernameUsernameResponse(w http.ResponseWriter) error
+}
+
+type GetAccountUserIdForUsernameUsername200JSONResponse GithubUsernameSearchResponseModel
+
+func (response GetAccountUserIdForUsernameUsername200JSONResponse) VisitGetAccountUserIdForUsernameUsernameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAccountUserIdForUsernameUsername401JSONResponse ServerHttpError
+
+func (response GetAccountUserIdForUsernameUsername401JSONResponse) VisitGetAccountUserIdForUsernameUsernameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAccountUserIdForUsernameUsername404JSONResponse ServerHttpError
+
+func (response GetAccountUserIdForUsernameUsername404JSONResponse) VisitGetAccountUserIdForUsernameUsernameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type GetAccountUserIdForUsernameUsername500JSONResponse ServerHttpError
+
+func (response GetAccountUserIdForUsernameUsername500JSONResponse) VisitGetAccountUserIdForUsernameUsernameResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
 }
 
 type PostEnvironmentRequestObject struct {
@@ -489,6 +646,52 @@ func (response GetEnvironmentInstanceIdList500JSONResponse) VisitGetEnvironmentI
 	return json.NewEncoder(w).Encode(response)
 }
 
+type PatchEnvironmentAddUserEnvironmentIdUserIdRequestObject struct {
+	EnvironmentId string `json:"environmentId"`
+	UserId        string `json:"userId"`
+	Params        PatchEnvironmentAddUserEnvironmentIdUserIdParams
+}
+
+type PatchEnvironmentAddUserEnvironmentIdUserIdResponseObject interface {
+	VisitPatchEnvironmentAddUserEnvironmentIdUserIdResponse(w http.ResponseWriter) error
+}
+
+type PatchEnvironmentAddUserEnvironmentIdUserId200JSONResponse PreviewEnvironmentModel
+
+func (response PatchEnvironmentAddUserEnvironmentIdUserId200JSONResponse) VisitPatchEnvironmentAddUserEnvironmentIdUserIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchEnvironmentAddUserEnvironmentIdUserId401JSONResponse ServerHttpError
+
+func (response PatchEnvironmentAddUserEnvironmentIdUserId401JSONResponse) VisitPatchEnvironmentAddUserEnvironmentIdUserIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchEnvironmentAddUserEnvironmentIdUserId404JSONResponse ServerHttpError
+
+func (response PatchEnvironmentAddUserEnvironmentIdUserId404JSONResponse) VisitPatchEnvironmentAddUserEnvironmentIdUserIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchEnvironmentAddUserEnvironmentIdUserId500JSONResponse ServerHttpError
+
+func (response PatchEnvironmentAddUserEnvironmentIdUserId500JSONResponse) VisitPatchEnvironmentAddUserEnvironmentIdUserIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
 type GetEnvironmentListRequestObject struct {
 	Params GetEnvironmentListParams
 }
@@ -509,6 +712,52 @@ func (response GetEnvironmentList200JSONResponse) VisitGetEnvironmentListRespons
 type GetEnvironmentList500JSONResponse ServerHttpError
 
 func (response GetEnvironmentList500JSONResponse) VisitGetEnvironmentListResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(500)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchEnvironmentRemoveUserEnvironmentIdUserIdRequestObject struct {
+	EnvironmentId string `json:"environmentId"`
+	UserId        string `json:"userId"`
+	Params        PatchEnvironmentRemoveUserEnvironmentIdUserIdParams
+}
+
+type PatchEnvironmentRemoveUserEnvironmentIdUserIdResponseObject interface {
+	VisitPatchEnvironmentRemoveUserEnvironmentIdUserIdResponse(w http.ResponseWriter) error
+}
+
+type PatchEnvironmentRemoveUserEnvironmentIdUserId200JSONResponse PreviewEnvironmentModel
+
+func (response PatchEnvironmentRemoveUserEnvironmentIdUserId200JSONResponse) VisitPatchEnvironmentRemoveUserEnvironmentIdUserIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchEnvironmentRemoveUserEnvironmentIdUserId401JSONResponse ServerHttpError
+
+func (response PatchEnvironmentRemoveUserEnvironmentIdUserId401JSONResponse) VisitPatchEnvironmentRemoveUserEnvironmentIdUserIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchEnvironmentRemoveUserEnvironmentIdUserId404JSONResponse ServerHttpError
+
+func (response PatchEnvironmentRemoveUserEnvironmentIdUserId404JSONResponse) VisitPatchEnvironmentRemoveUserEnvironmentIdUserIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchEnvironmentRemoveUserEnvironmentIdUserId500JSONResponse ServerHttpError
+
+func (response PatchEnvironmentRemoveUserEnvironmentIdUserId500JSONResponse) VisitPatchEnvironmentRemoveUserEnvironmentIdUserIdResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(500)
 
@@ -595,71 +844,32 @@ func (response GetGithubRepositories500JSONResponse) VisitGetGithubRepositoriesR
 	return json.NewEncoder(w).Encode(response)
 }
 
-type GetGithubUserIdForUsernameUsernameRequestObject struct {
-	Username string `json:"username"`
-	Params   GetGithubUserIdForUsernameUsernameParams
-}
-
-type GetGithubUserIdForUsernameUsernameResponseObject interface {
-	VisitGetGithubUserIdForUsernameUsernameResponse(w http.ResponseWriter) error
-}
-
-type GetGithubUserIdForUsernameUsername200JSONResponse GithubUsernameSearchResponseModel
-
-func (response GetGithubUserIdForUsernameUsername200JSONResponse) VisitGetGithubUserIdForUsernameUsernameResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(200)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetGithubUserIdForUsernameUsername401JSONResponse ServerHttpError
-
-func (response GetGithubUserIdForUsernameUsername401JSONResponse) VisitGetGithubUserIdForUsernameUsernameResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(401)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetGithubUserIdForUsernameUsername404JSONResponse ServerHttpError
-
-func (response GetGithubUserIdForUsernameUsername404JSONResponse) VisitGetGithubUserIdForUsernameUsernameResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(404)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
-type GetGithubUserIdForUsernameUsername500JSONResponse ServerHttpError
-
-func (response GetGithubUserIdForUsernameUsername500JSONResponse) VisitGetGithubUserIdForUsernameUsernameResponse(w http.ResponseWriter) error {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(500)
-
-	return json.NewEncoder(w).Encode(response)
-}
-
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Get the userId for a given username
+	// (GET /account/userIdForUsername/{username})
+	GetAccountUserIdForUsernameUsername(ctx context.Context, request GetAccountUserIdForUsernameUsernameRequestObject) (GetAccountUserIdForUsernameUsernameResponseObject, error)
 	// Creates a new environment
 	// (POST /environment)
 	PostEnvironment(ctx context.Context, request PostEnvironmentRequestObject) (PostEnvironmentResponseObject, error)
 	// Lists all instances of an environment
 	// (GET /environment-instance/{id}/list)
 	GetEnvironmentInstanceIdList(ctx context.Context, request GetEnvironmentInstanceIdListRequestObject) (GetEnvironmentInstanceIdListResponseObject, error)
+	// Add a user to an environment
+	// (PATCH /environment/addUser/{environmentId}/{userId})
+	PatchEnvironmentAddUserEnvironmentIdUserId(ctx context.Context, request PatchEnvironmentAddUserEnvironmentIdUserIdRequestObject) (PatchEnvironmentAddUserEnvironmentIdUserIdResponseObject, error)
 	// List all available Environments
 	// (GET /environment/list)
 	GetEnvironmentList(ctx context.Context, request GetEnvironmentListRequestObject) (GetEnvironmentListResponseObject, error)
+	// Remove a user from an environment
+	// (PATCH /environment/removeUser/{environmentId}/{userId})
+	PatchEnvironmentRemoveUserEnvironmentIdUserId(ctx context.Context, request PatchEnvironmentRemoveUserEnvironmentIdUserIdRequestObject) (PatchEnvironmentRemoveUserEnvironmentIdUserIdResponseObject, error)
 	// Deletes an environment
 	// (DELETE /environment/{id})
 	DeleteEnvironmentId(ctx context.Context, request DeleteEnvironmentIdRequestObject) (DeleteEnvironmentIdResponseObject, error)
 	// Lists all the repositories of the authenticated user
 	// (GET /github/repositories)
 	GetGithubRepositories(ctx context.Context, request GetGithubRepositoriesRequestObject) (GetGithubRepositoriesResponseObject, error)
-	// Get the userId for a given username
-	// (GET /github/userIdForUsername/{username})
-	GetGithubUserIdForUsernameUsername(ctx context.Context, request GetGithubUserIdForUsernameUsernameRequestObject) (GetGithubUserIdForUsernameUsernameResponseObject, error)
 }
 
 type StrictHandlerFunc = strictecho.StrictEchoHandlerFunc
@@ -672,6 +882,32 @@ func NewStrictHandler(ssi StrictServerInterface, middlewares []StrictMiddlewareF
 type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
+}
+
+// GetAccountUserIdForUsernameUsername operation middleware
+func (sh *strictHandler) GetAccountUserIdForUsernameUsername(ctx echo.Context, username string, params GetAccountUserIdForUsernameUsernameParams) error {
+	var request GetAccountUserIdForUsernameUsernameRequestObject
+
+	request.Username = username
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAccountUserIdForUsernameUsername(ctx.Request().Context(), request.(GetAccountUserIdForUsernameUsernameRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAccountUserIdForUsernameUsername")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(GetAccountUserIdForUsernameUsernameResponseObject); ok {
+		return validResponse.VisitGetAccountUserIdForUsernameUsernameResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
 }
 
 // PostEnvironment operation middleware
@@ -731,6 +967,33 @@ func (sh *strictHandler) GetEnvironmentInstanceIdList(ctx echo.Context, id strin
 	return nil
 }
 
+// PatchEnvironmentAddUserEnvironmentIdUserId operation middleware
+func (sh *strictHandler) PatchEnvironmentAddUserEnvironmentIdUserId(ctx echo.Context, environmentId string, userId string, params PatchEnvironmentAddUserEnvironmentIdUserIdParams) error {
+	var request PatchEnvironmentAddUserEnvironmentIdUserIdRequestObject
+
+	request.EnvironmentId = environmentId
+	request.UserId = userId
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchEnvironmentAddUserEnvironmentIdUserId(ctx.Request().Context(), request.(PatchEnvironmentAddUserEnvironmentIdUserIdRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchEnvironmentAddUserEnvironmentIdUserId")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(PatchEnvironmentAddUserEnvironmentIdUserIdResponseObject); ok {
+		return validResponse.VisitPatchEnvironmentAddUserEnvironmentIdUserIdResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
 // GetEnvironmentList operation middleware
 func (sh *strictHandler) GetEnvironmentList(ctx echo.Context, params GetEnvironmentListParams) error {
 	var request GetEnvironmentListRequestObject
@@ -750,6 +1013,33 @@ func (sh *strictHandler) GetEnvironmentList(ctx echo.Context, params GetEnvironm
 		return err
 	} else if validResponse, ok := response.(GetEnvironmentListResponseObject); ok {
 		return validResponse.VisitGetEnvironmentListResponse(ctx.Response())
+	} else if response != nil {
+		return fmt.Errorf("unexpected response type: %T", response)
+	}
+	return nil
+}
+
+// PatchEnvironmentRemoveUserEnvironmentIdUserId operation middleware
+func (sh *strictHandler) PatchEnvironmentRemoveUserEnvironmentIdUserId(ctx echo.Context, environmentId string, userId string, params PatchEnvironmentRemoveUserEnvironmentIdUserIdParams) error {
+	var request PatchEnvironmentRemoveUserEnvironmentIdUserIdRequestObject
+
+	request.EnvironmentId = environmentId
+	request.UserId = userId
+	request.Params = params
+
+	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
+		return sh.ssi.PatchEnvironmentRemoveUserEnvironmentIdUserId(ctx.Request().Context(), request.(PatchEnvironmentRemoveUserEnvironmentIdUserIdRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "PatchEnvironmentRemoveUserEnvironmentIdUserId")
+	}
+
+	response, err := handler(ctx, request)
+
+	if err != nil {
+		return err
+	} else if validResponse, ok := response.(PatchEnvironmentRemoveUserEnvironmentIdUserIdResponseObject); ok {
+		return validResponse.VisitPatchEnvironmentRemoveUserEnvironmentIdUserIdResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}
@@ -801,32 +1091,6 @@ func (sh *strictHandler) GetGithubRepositories(ctx echo.Context, params GetGithu
 		return err
 	} else if validResponse, ok := response.(GetGithubRepositoriesResponseObject); ok {
 		return validResponse.VisitGetGithubRepositoriesResponse(ctx.Response())
-	} else if response != nil {
-		return fmt.Errorf("unexpected response type: %T", response)
-	}
-	return nil
-}
-
-// GetGithubUserIdForUsernameUsername operation middleware
-func (sh *strictHandler) GetGithubUserIdForUsernameUsername(ctx echo.Context, username string, params GetGithubUserIdForUsernameUsernameParams) error {
-	var request GetGithubUserIdForUsernameUsernameRequestObject
-
-	request.Username = username
-	request.Params = params
-
-	handler := func(ctx echo.Context, request interface{}) (interface{}, error) {
-		return sh.ssi.GetGithubUserIdForUsernameUsername(ctx.Request().Context(), request.(GetGithubUserIdForUsernameUsernameRequestObject))
-	}
-	for _, middleware := range sh.middlewares {
-		handler = middleware(handler, "GetGithubUserIdForUsernameUsername")
-	}
-
-	response, err := handler(ctx, request)
-
-	if err != nil {
-		return err
-	} else if validResponse, ok := response.(GetGithubUserIdForUsernameUsernameResponseObject); ok {
-		return validResponse.VisitGetGithubUserIdForUsernameUsernameResponse(ctx.Response())
 	} else if response != nil {
 		return fmt.Errorf("unexpected response type: %T", response)
 	}

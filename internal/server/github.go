@@ -67,7 +67,7 @@ func (s Server) GetGithubRepositories(ctx context.Context, request apigen.GetGit
 
 // Get the userId for a given username
 // (GET /github/userIdForUsername/{username})
-func (s Server) GetGithubUserIdForUsernameUsername(ctx context.Context, request apigen.GetGithubUserIdForUsernameUsernameRequestObject) (apigen.GetGithubUserIdForUsernameUsernameResponseObject, error) {
+func (s Server) GetAccountUserIdForUsernameUsername(ctx context.Context, request apigen.GetAccountUserIdForUsernameUsernameRequestObject) (apigen.GetAccountUserIdForUsernameUsernameResponseObject, error) {
 	_, err := s.userIdFromAuthenticationToken(ctx, request.Params.Authentication)
 	if err != nil {
 		return nil, echo.NewHTTPError(401, err.Error())
@@ -84,7 +84,7 @@ func (s Server) GetGithubUserIdForUsernameUsername(ctx context.Context, request 
 		return nil, echo.NewHTTPError(500, err.Error())
 	}
 
-	return apigen.GetGithubUserIdForUsernameUsername200JSONResponse(apigen.GithubUsernameSearchResponseModel{
+	return apigen.GetAccountUserIdForUsernameUsername200JSONResponse(apigen.GithubUsernameSearchResponseModel{
 		UserId:   *user.ID,
 		Username: request.Username,
 	}), nil

@@ -200,10 +200,10 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/server.httpError'
-  /github/userIdForUsername/{username}:
+  /account/userIdForUsername/{username}:
     get:
       tags:
-        - github
+        - account
       summary: Get the userId for a given username
       description: Get the userId for a given username
       parameters:
@@ -234,6 +234,112 @@ paths:
                 $ref: '#/components/schemas/server.httpError'
         "404":
           description: User Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.httpError'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.httpError'
+  /environment/addUser/{environmentId}/{userId}:
+    patch:
+      tags:
+        - environment
+      summary: Add a user to an environment
+      description: Add a user to an environment
+      parameters:
+        - name: environmentId
+          in: path
+          description: Id of the environment that the user should be added to
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          description: Id of the user that should be added to the environment
+          required: true  
+          schema:
+            type: string
+        - name: authentication
+          in: header
+          description: Authentication token
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/previewEnvironmentModel'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.httpError'
+        "404":
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.httpError'
+        "409":
+          description: Conflict
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.httpError'
+        "500":
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.httpError'
+  /environment/removeUser/{environmentId}/{userId}:
+    patch:
+      tags:
+        - environment
+      summary: Remove a user from an environment
+      description: Remove a user from an environment
+      parameters:
+        - name: environmentId
+          in: path
+          description: Id of the environment that the user should be removed from
+          required: true
+          schema:
+            type: string
+        - name: userId
+          in: path
+          description: Id of the user that should be removed from the environment
+          required: true  
+          schema:
+            type: string
+        - name: authentication
+          in: header
+          description: Authentication token
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/previewEnvironmentModel'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/server.httpError'
+        "404":
+          description: Not Found
           content:
             application/json:
               schema:
@@ -391,5 +497,5 @@ components:
       type: object
       properties:
         message:
-          type: object
+          type: string
 
