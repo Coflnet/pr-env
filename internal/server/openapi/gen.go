@@ -16,7 +16,10 @@ import (
 
 // AccessSettingsModel defines model for accessSettingsModel.
 type AccessSettingsModel struct {
-	UserIds []string `json:"userIds"`
+	Users []struct {
+		UserId   string `json:"userId"`
+		Username string `json:"username"`
+	} `json:"users"`
 }
 
 // ApplicationSettingsModel defines model for applicationSettingsModel.
@@ -679,6 +682,15 @@ type PatchEnvironmentAddUserEnvironmentIdUserId404JSONResponse ServerHttpError
 func (response PatchEnvironmentAddUserEnvironmentIdUserId404JSONResponse) VisitPatchEnvironmentAddUserEnvironmentIdUserIdResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+
+	return json.NewEncoder(w).Encode(response)
+}
+
+type PatchEnvironmentAddUserEnvironmentIdUserId409JSONResponse ServerHttpError
+
+func (response PatchEnvironmentAddUserEnvironmentIdUserId409JSONResponse) VisitPatchEnvironmentAddUserEnvironmentIdUserIdResponse(w http.ResponseWriter) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
 
 	return json.NewEncoder(w).Encode(response)
 }

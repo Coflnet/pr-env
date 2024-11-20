@@ -434,12 +434,20 @@ components:
     accessSettingsModel:
       type: object
       required: 
-        - userIds
+      - users
       properties:
-        userIds:
+        users:
           type: array
           items:
-            type: string
+            type: object
+            required:
+              - userId
+              - username
+            properties:
+              userId:
+                type: string
+              username:
+                type: string
     previewEnvironmentInstanceModel:
       type: object
       required:

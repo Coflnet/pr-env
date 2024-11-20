@@ -147,6 +147,14 @@ func convertFromEnvironmentModel(userId string, in apigen.PreviewEnvironmentMode
 		}
 	}
 
+	users := []coflnetv1alpha1.UserAccess{}
+	for _, u := range in.AccessSettings.Users {
+		users = append(users, coflnetv1alpha1.UserAccess{
+			UserId:   u.UserId,
+			Username: u.Username,
+		})
+	}
+
 	return &coflnetv1alpha1.PreviewEnvironment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -155,7 +163,10 @@ func convertFromEnvironmentModel(userId string, in apigen.PreviewEnvironmentMode
 			},
 		},
 		Spec: coflnetv1alpha1.PreviewEnvironmentSpec{
-			AccessSettings: coflnetv1alpha1.AccessSettings{},
+			AccessSettings: coflnetv1alpha1.AccessSettings{
+				Users:        users,
+				PublicAccess: false,
+			},
 			ApplicationSettings: coflnetv1alpha1.ApplicationSettings{
 				Command:              in.ApplicationSettings.Command,
 				EnvironmentVariables: &vars,
@@ -197,8 +208,25 @@ func convertToEnvironmentModel(in *coflnetv1alpha1.PreviewEnvironment) apigen.Pr
 		}
 	}
 
+	users := make([]struct {
+		UserId   string `json:"userId"`
+		Username string `json:"username"`
+	}, len(in.Spec.AccessSettings.Users))
+
+	for i, u := range in.Spec.AccessSettings.Users {
+		users[i] = struct {
+			UserId   string `json:"userId"`
+			Username string `json:"username"`
+		}{
+			UserId:   u.UserId,
+			Username: u.Username,
+		}
+	}
+
 	return apigen.PreviewEnvironmentModel{
-		AccessSettings: apigen.AccessSettingsModel{},
+		AccessSettings: apigen.AccessSettingsModel{
+			Users: users,
+		},
 		ApplicationSettings: apigen.ApplicationSettingsModel{
 			Command:              in.Spec.ApplicationSettings.Command,
 			EnvironmentVariables: &vars,
