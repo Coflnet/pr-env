@@ -40,6 +40,19 @@ spec:
           spec:
             description: PreviewEnvironmentSpec defines the desired state of PreviewEnvironment.
             properties:
+              accessSettings:
+                description: AccessSettings configuration for the access control
+                properties:
+                  allowedUserIds:
+                    description: |-
+                      AllowedUserIds is a list of user ids that are allowed to access the preview environment
+                      the ids are the keycloak user ids
+                    items:
+                      type: string
+                    type: array
+                required:
+                - allowedUserIds
+                type: object
               applicationSettings:
                 description: ApplicationSettings configuration for the running application
                 properties:
@@ -138,6 +151,7 @@ spec:
                 - repository
                 type: object
             required:
+            - accessSettings
             - applicationSettings
             - buildSettings
             - containerRegistry

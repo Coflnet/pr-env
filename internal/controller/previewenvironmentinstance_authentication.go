@@ -12,7 +12,7 @@ func (r *PreviewEnvironmentInstanceReconciler) setupAuthenticationForInstance(ct
 		return err
 	}
 
-	return r.addUsersToGroup(ctx, pei)
+	return r.addUsersToGroup(ctx, pe, pei)
 }
 
 func (r *PreviewEnvironmentInstanceReconciler) createKeycloakGroupIfNotExists(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
@@ -36,7 +36,7 @@ func (r *PreviewEnvironmentInstanceReconciler) createKeycloakGroupIfNotExists(ct
 	return nil
 }
 
-func (r *PreviewEnvironmentInstanceReconciler) addUsersToGroup(ctx context.Context, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
+func (r *PreviewEnvironmentInstanceReconciler) addUsersToGroup(ctx context.Context, pe *coflnetv1alpha1.PreviewEnvironment, pei *coflnetv1alpha1.PreviewEnvironmentInstance) error {
 	// add the owner to the group
 	ownerId := pei.GetOwner()
 	r.log.Info("Adding owner to group", "owner", ownerId, "group", pei.GetName())
@@ -46,6 +46,14 @@ func (r *PreviewEnvironmentInstanceReconciler) addUsersToGroup(ctx context.Conte
 	}
 
 	// add the users to the group
-	r.log.Info("Adding users to group is not implemented yet", "group", pei.GetName())
+	r.log.Info("Adding users to the group", "group", pei.GetName(), "userIds", len(pe.Spec.AccessSettings.AllowedUserIds))
+	for _, userId := range pe.Spec.AccessSettings.AllowedUserIds {
+		r.log.Info("Adding user to group", "user", userId, "group", pei.GetName())
+		err := r.keycloakClient.AddUserToGroup(ctx, userId, pei.GetName())
+		if err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

@@ -88,6 +88,9 @@ func convertFromEnvironmentModel(userId string, in apigen.PreviewEnvironmentMode
 			},
 		},
 		Spec: coflnetv1alpha1.PreviewEnvironmentSpec{
+			AccessSettings: coflnetv1alpha1.AccessSettings{
+				AllowedUserIds: in.AccessSettings.UserIds,
+			},
 			ApplicationSettings: coflnetv1alpha1.ApplicationSettings{
 				Command:              in.ApplicationSettings.Command,
 				EnvironmentVariables: &vars,
@@ -130,6 +133,9 @@ func convertToEnvironmentModel(in *coflnetv1alpha1.PreviewEnvironment) apigen.Pr
 	}
 
 	return apigen.PreviewEnvironmentModel{
+		AccessSettings: apigen.AccessSettingsModel{
+			UserIds: in.Spec.AccessSettings.AllowedUserIds,
+		},
 		ApplicationSettings: apigen.ApplicationSettingsModel{
 			Command:              in.Spec.ApplicationSettings.Command,
 			EnvironmentVariables: &vars,

@@ -211,6 +211,7 @@ components:
         - buildSettings
         - name
         - id
+        - accessSettings
       properties:
         applicationSettings:
           $ref: '#/components/schemas/applicationSettingsModel'
@@ -220,6 +221,8 @@ components:
           $ref: '#/components/schemas/gitSettingsModel'
         buildSettings:
           $ref: '#/components/schemas/buildSettings'
+        accessSettings:
+          $ref: '#/components/schemas/accessSettingsModel'
         name:
           type: string
         id:
@@ -278,6 +281,15 @@ components:
           type: string
         dockerFilePath:
           type: string
+    accessSettingsModel:
+      type: object
+      required: 
+        - userIds
+      properties:
+        userIds:
+          type: array
+          items:
+            type: string
     previewEnvironmentInstanceModel:
       type: object
       required:

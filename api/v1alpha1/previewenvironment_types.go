@@ -57,6 +57,10 @@ type PreviewEnvironmentSpec struct {
 	// +kubebuilder:validation:Required
 	// DisplayName is the name that can be displayed to the user
 	DisplayName string `json:"displayName"`
+
+	// +kubebuilder:validation:Required
+	// AccessSettings configuration for the access control
+	AccessSettings AccessSettings `json:"accessSettings"`
 }
 
 type BuildSettings struct {
@@ -113,6 +117,13 @@ type ApplicationSettings struct {
 	// +optional
 	// Command is optional and can be used to override the default command that is used to start the application
 	Command *string `json:"command"`
+}
+
+type AccessSettings struct {
+	// +kubebuilder:validation:Required
+	// AllowedUserIds is a list of user ids that are allowed to access the preview environment
+	// the ids are the keycloak user ids
+	AllowedUserIds []string `json:"allowedUserIds"`
 }
 
 // PreviewEnvironmentStatus defines the observed state of PreviewEnvironment.

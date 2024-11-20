@@ -14,6 +14,11 @@ import (
 	strictecho "github.com/oapi-codegen/runtime/strictmiddleware/echo"
 )
 
+// AccessSettingsModel defines model for accessSettingsModel.
+type AccessSettingsModel struct {
+	UserIds []string `json:"userIds"`
+}
+
 // ApplicationSettingsModel defines model for applicationSettingsModel.
 type ApplicationSettingsModel struct {
 	Command              *string                     `json:"command,omitempty"`
@@ -73,6 +78,7 @@ type PreviewEnvironmentInstanceModel struct {
 
 // PreviewEnvironmentModel defines model for previewEnvironmentModel.
 type PreviewEnvironmentModel struct {
+	AccessSettings      AccessSettingsModel      `json:"accessSettings"`
 	ApplicationSettings ApplicationSettingsModel `json:"applicationSettings"`
 	BuildSettings       BuildSettings            `json:"buildSettings"`
 	ContainerSettings   ContainerSettingsModel   `json:"containerSettings"`
