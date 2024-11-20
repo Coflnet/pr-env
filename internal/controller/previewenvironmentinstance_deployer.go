@@ -379,7 +379,6 @@ func (r *PreviewEnvironmentInstanceReconciler) deployAuthenticationProxyIngress(
 			},
 			Annotations: map[string]string{
 				"kubernetes.io/ingress.class":                   "nginx",
-				"cert-manager.io/cluster-issuer":                "letsencrypt-prod",
 				"nginx.ingress.kubernetes.io/proxy-buffer-size": "512k",
 			},
 		},
@@ -410,7 +409,7 @@ func (r *PreviewEnvironmentInstanceReconciler) deployAuthenticationProxyIngress(
 			TLS: []networkingv1.IngressTLS{
 				{
 					Hosts:      []string{pe.Spec.ApplicationSettings.IngressHostname},
-					SecretName: fmt.Sprintf("%s-tls", pei.NameForAuthProxy()),
+					SecretName: "web-tls",
 				},
 			},
 		},
@@ -475,7 +474,6 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesIngress(ctx conte
 			Namespace: pei.GetNamespace(),
 			Annotations: map[string]string{
 				"nginx.ingress.kubernetes.io/rewrite-target":        "/",
-				"cert-manager.io/cluster-issuer":                    "letsencrypt-prod",
 				"nginx.ingress.kubernetes.io/auth-response-headers": "Authorization",
 				"nginx.ingress.kubernetes.io/auth-signin":           "https://$host/oauth2/start?rd=$escaped_request_uri",
 				"nginx.ingress.kubernetes.io/proxy-buffer-size":     "512k",
@@ -512,6 +510,12 @@ func (r *PreviewEnvironmentInstanceReconciler) deployKubernetesIngress(ctx conte
 							},
 						},
 					},
+				},
+			},
+			TLS: []networkingv1.IngressTLS{
+				{
+					Hosts:      []string{host},
+					SecretName: "web-tls",
 				},
 			},
 		},
